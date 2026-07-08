@@ -138,8 +138,135 @@ function StepFlow({ active }) {
   );
 }
 
+function loadJsPDF() {
+  return new Promise((resolve, reject) => {
+    if (window.jspdf) return resolve(window.jspdf);
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+    script.onload = () => resolve(window.jspdf);
+    script.onerror = () => reject(new Error("No se pudo cargar el generador de PDF"));
+    document.head.appendChild(script);
+  });
+}
+
+function buildContractPdf({ jsPDF, event, profile, today }) {
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const pageW = doc.internal.pageSize.getWidth();
+  const margin = 48;
+  const contentW = pageW - margin * 2;
+  let y = 56;
+
+  const NAVY = [27, 42, 74];
+  const GOLD = [184, 134, 11];
+  const GREY = [90, 90, 90];
+
+  // Header bar
+  doc.setFillColor(...NAVY);
+  doc.rect(0, 0, pageW, 70, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("times", "bold");
+  doc.setFontSize(18);
+  doc.text("Anexo I + Contrato de Prestación de Servicios", margin, 42);
+  y = 100;
+
+  // Anexo I box
+  doc.setFillColor(245, 230, 200);
+  doc.roundedRect(margin, y, contentW, 100, 6, 6, "F");
+  doc.setTextColor(...NAVY);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("ANEXO I — DATOS DEL EVENTO", margin + 14, y + 20);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  const anexoLines = [
+    `Cliente: ${event.clientName}`,
+    `Ubicación: ${event.venue}, ${event.location}`,
+    `Fecha: ${event.date}    Horario: ${event.time}`,
+    `Funciones: ${event.functions}`,
+    `Precio pactado: ${event.budget} € (IVA no incluido)`,
+  ];
+  let ay = y + 38;
+  anexoLines.forEach((line) => {
+    const wrapped = doc.splitTextToSize(line, contentW - 28);
+    doc.text(wrapped, margin + 14, ay);
+    ay += wrapped.length * 12;
+  });
+  y += 116;
+
+  // Contract body
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...GOLD);
+  doc.text("CONTRATO DE PRESTACIÓN DE SERVICIOS", margin, y);
+  y += 18;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9.5);
+  doc.setTextColor(40, 40, 40);
+
+  const paragraphs = [
+    `En Madrid, a ${today}, de una parte ${profile.name}, mayor de edad, en su condición de trabajadora autónoma, en adelante "la Profesional"; de otra, ${event.clientName}, en adelante "el Cliente".`,
+    `Artículo 1. Objeto. La Profesional se obliga a prestar al Cliente el servicio descrito en el Anexo I, a cambio del precio allí pactado.`,
+    `Artículo 2. Naturaleza mercantil. La Profesional presta sus servicios con plena autonomía e independencia organizativa, sin sujeción a horario impuesto más allá de la duración del evento, por lo que este contrato tiene naturaleza de arrendamiento de servicios (arts. 1544 y ss. Código Civil).`,
+    `Artículo 3. Pago. El Cliente abonará el importe pactado contra factura emitida por la Profesional. La comisión de intermediación de la Plataforma se factura de forma independiente.`,
+  ];
+
+  paragraphs.forEach((para) => {
+    const wrapped = doc.splitTextToSize(para, contentW);
+    if (y + wrapped.length * 13 > 760) {
+      doc.addPage();
+      y = 56;
+    }
+    doc.text(wrapped, margin, y);
+    y += wrapped.length * 13 + 10;
+  });
+
+  // Signatures
+  y += 30;
+  if (y > 740) {
+    doc.addPage();
+    y = 80;
+  }
+  doc.setDrawColor(...GREY);
+  doc.line(margin, y, margin + 180, y);
+  doc.line(pageW - margin - 180, y, pageW - margin, y);
+  doc.setFontSize(9);
+  doc.setTextColor(...GREY);
+  doc.text("La Profesional", margin, y + 14);
+  doc.text("El Cliente", pageW - margin - 180, y + 14);
+
+  // Footer note
+  doc.setFontSize(7.5);
+  doc.setTextColor(...GREY);
+  doc.text(
+    "Documento generado automáticamente a partir de la plantilla legal del proyecto. Requiere firma de ambas partes para su validez.",
+    margin, 812
+  );
+
+  return doc;
+}
+
 function ContractPreview({ event, profile, onClose }) {
   const today = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+  const [downloading, setDownloading] = useState(false);
+  const [pdfError, setPdfError] = useState("");
+
+  async function handleDownload() {
+    setDownloading(true);
+    setPdfError("");
+    try {
+      const { jsPDF } = await loadJsPDF();
+      const doc = buildContractPdf({ jsPDF, event, profile, today });
+      const safeName = `${event.venue}_${profile.name}`.replace(/[^a-zA-Z0-9]+/g, "_");
+      doc.save(`Contrato_${safeName}.pdf`);
+    } catch (err) {
+      console.error(err);
+      setPdfError("No se pudo generar el PDF. Comprueba tu conexión e inténtalo de nuevo.");
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(27,42,74,0.55)" }}>
       <div className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-2xl">
@@ -167,15 +294,27 @@ function ContractPreview({ event, profile, onClose }) {
           <p><strong>Artículo 3. Pago.</strong> El Cliente abonará el importe pactado contra factura emitida por la Profesional. La comisión de intermediación de la Plataforma se factura de forma independiente.</p>
           <p className="text-xs text-stone-400 pt-2">Documento generado automáticamente a partir de la plantilla legal del proyecto. Requiere firma de ambas partes para su validez.</p>
         </div>
-        <div className="p-5 border-t flex justify-end" style={{ borderColor: "#E5E0D3" }}>
-          <button
-            onClick={onClose}
-            className="font-body text-sm font-semibold px-5 py-2.5 rounded-full text-white"
-            style={{ backgroundColor: "#1B2A4A" }}
-          >
-            Cerrar vista previa
-          </button>
+        <div className="p-5 border-t flex flex-col gap-2" style={{ borderColor: "#E5E0D3" }}>
+          {pdfError && <p className="text-xs font-body" style={{ color: "#C0392B" }}>{pdfError}</p>}
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={onClose}
+              className="font-body text-sm font-semibold px-5 py-2.5 rounded-full"
+              style={{ color: "#1B2A4A", border: "1px solid #E5E0D3" }}
+            >
+              Cerrar
+            </button>
+            <button
+              onClick={handleDownload}
+              disabled={downloading}
+              className="flex items-center gap-2 font-body text-sm font-semibold px-5 py-2.5 rounded-full text-white disabled:opacity-60"
+              style={{ backgroundColor: "#B8860B" }}
+            >
+              <FileText size={14} /> {downloading ? "Generando PDF…" : "Descargar PDF"}
+            </button>
+          </div>
         </div>
+
       </div>
     </div>
   );
