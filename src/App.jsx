@@ -138,112 +138,114 @@ function StepFlow({ active }) {
   );
 }
 
-function loadJsPDF() {
+function loadPdfLib() {
   return new Promise((resolve, reject) => {
-    if (window.jspdf) return resolve(window.jspdf);
+    if (window.PDFLib) return resolve(window.PDFLib);
     const script = document.createElement("script");
-    script.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
-    script.onload = () => resolve(window.jspdf);
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js";
+    script.onload = () => resolve(window.PDFLib);
     script.onerror = () => reject(new Error("No se pudo cargar el generador de PDF"));
     document.head.appendChild(script);
   });
 }
 
-function buildContractPdf({ jsPDF, event, profile, today }) {
-  const doc = new jsPDF({ unit: "pt", format: "a4" });
-  const pageW = doc.internal.pageSize.getWidth();
+// Genera el contrato real: una portada con los datos del evento ya rellenados,
+// seguida de las páginas ORIGINALES e intactas del modelo oficial del SEPE
+// (contrato artístico de duración determinada, códigos 407/507).
+async function buildOfficialContractPdf({ PDFLib, event, profile, today }) {
+  const { PDFDocument, rgb, StandardFonts } = PDFLib;
+
+  const baseBytes = await fetch("/contrato-base-sepe.pdf").then((r) => {
+    if (!r.ok) throw new Error("No se encontró el documento base del SEPE");
+    return r.arrayBuffer();
+  });
+  const baseDoc = await PDFDocument.load(baseBytes);
+
+  const outDoc = await PDFDocument.create();
+  const fontRegular = await outDoc.embedFont(StandardFonts.Helvetica);
+  const fontBold = await outDoc.embedFont(StandardFonts.HelveticaBold);
+
+  const NAVY = rgb(27 / 255, 42 / 255, 74 / 255);
+  const GOLD = rgb(184 / 255, 134 / 255, 11 / 255);
+  const GOLD_LIGHT = rgb(245 / 255, 230 / 255, 200 / 255);
+  const GREY = rgb(90 / 255, 90 / 255, 90 / 255);
+  const DARK = rgb(0.15, 0.15, 0.15);
+
+  // ---------- Portada de datos (generada) ----------
+  const page = outDoc.addPage([595.28, 841.89]);
+  const { width: pageW, height: pageH } = page.getSize();
   const margin = 48;
-  const contentW = pageW - margin * 2;
-  let y = 56;
 
-  const NAVY = [27, 42, 74];
-  const GOLD = [184, 134, 11];
-  const GREY = [90, 90, 90];
-
-  // Header bar
-  doc.setFillColor(...NAVY);
-  doc.rect(0, 0, pageW, 70, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.setFont("times", "bold");
-  doc.setFontSize(18);
-  doc.text("Anexo I + Contrato de Prestación de Servicios", margin, 42);
-  y = 100;
-
-  // Anexo I box
-  doc.setFillColor(245, 230, 200);
-  doc.roundedRect(margin, y, contentW, 100, 6, 6, "F");
-  doc.setTextColor(...NAVY);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.text("ANEXO I — DATOS DEL EVENTO", margin + 14, y + 20);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  const anexoLines = [
-    `Cliente: ${event.clientName}`,
-    `Ubicación: ${event.venue}, ${event.location}`,
-    `Fecha: ${event.date}    Horario: ${event.time}`,
-    `Funciones: ${event.functions}`,
-    `Precio pactado: ${event.budget} € (IVA no incluido)`,
-  ];
-  let ay = y + 38;
-  anexoLines.forEach((line) => {
-    const wrapped = doc.splitTextToSize(line, contentW - 28);
-    doc.text(wrapped, margin + 14, ay);
-    ay += wrapped.length * 12;
+  page.drawRectangle({ x: 0, y: pageH - 70, width: pageW, height: 70, color: NAVY });
+  page.drawText("Datos para cumplimentar el contrato oficial", {
+    x: margin, y: pageH - 34, size: 15, font: fontBold, color: rgb(1, 1, 1),
   });
-  y += 116;
-
-  // Contract body
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.setTextColor(...GOLD);
-  doc.text("CONTRATO DE PRESTACIÓN DE SERVICIOS", margin, y);
-  y += 18;
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9.5);
-  doc.setTextColor(40, 40, 40);
-
-  const paragraphs = [
-    `En Madrid, a ${today}, de una parte ${profile.name}, mayor de edad, en su condición de trabajadora autónoma, en adelante "la Profesional"; de otra, ${event.clientName}, en adelante "el Cliente".`,
-    `Artículo 1. Objeto. La Profesional se obliga a prestar al Cliente el servicio descrito en el Anexo I, a cambio del precio allí pactado.`,
-    `Artículo 2. Naturaleza mercantil. La Profesional presta sus servicios con plena autonomía e independencia organizativa, sin sujeción a horario impuesto más allá de la duración del evento, por lo que este contrato tiene naturaleza de arrendamiento de servicios (arts. 1544 y ss. Código Civil).`,
-    `Artículo 3. Pago. El Cliente abonará el importe pactado contra factura emitida por la Profesional. La comisión de intermediación de la Plataforma se factura de forma independiente.`,
-  ];
-
-  paragraphs.forEach((para) => {
-    const wrapped = doc.splitTextToSize(para, contentW);
-    if (y + wrapped.length * 13 > 760) {
-      doc.addPage();
-      y = 56;
-    }
-    doc.text(wrapped, margin, y);
-    y += wrapped.length * 13 + 10;
+  page.drawText("Contrato artístico de duración determinada — SEPE, códigos 407/507 (RD 1435/1985)", {
+    x: margin, y: pageH - 50, size: 9, font: fontRegular, color: rgb(1, 1, 1),
   });
 
-  // Signatures
-  y += 30;
-  if (y > 740) {
-    doc.addPage();
-    y = 80;
+  let y = pageH - 100;
+
+  function drawNote(text, size = 9, color = DARK, font = fontRegular) {
+    page.drawText(text, { x: margin, y, size, font, color });
+    y -= size + 8;
   }
-  doc.setDrawColor(...GREY);
-  doc.line(margin, y, margin + 180, y);
-  doc.line(pageW - margin - 180, y, pageW - margin, y);
-  doc.setFontSize(9);
-  doc.setTextColor(...GREY);
-  doc.text("La Profesional", margin, y + 14);
-  doc.text("El Cliente", pageW - margin - 180, y + 14);
+  function drawField(label, value) {
+    page.drawText(`${label}: `, { x: margin, y, size: 10, font: fontBold, color: NAVY });
+    const labelW = fontBold.widthOfTextAtSize(`${label}: `, 10);
+    page.drawText(String(value), { x: margin + labelW, y, size: 10, font: fontRegular, color: DARK });
+    y -= 18;
+  }
 
-  // Footer note
-  doc.setFontSize(7.5);
-  doc.setTextColor(...GREY);
-  doc.text(
-    "Documento generado automáticamente a partir de la plantilla legal del proyecto. Requiere firma de ambas partes para su validez.",
-    margin, 812
+  // Caja de aviso
+  page.drawRectangle({ x: margin, y: y - 74, width: pageW - margin * 2, height: 74, color: GOLD_LIGHT });
+  page.drawText("Esta portada es un resumen orientativo, generado automáticamente.", {
+    x: margin + 12, y: y - 16, size: 9.5, font: fontBold, color: NAVY,
+  });
+  page.drawText("Las páginas siguientes son el documento ORIGINAL del SEPE, sin modificar.", {
+    x: margin + 12, y: y - 32, size: 9, font: fontRegular, color: DARK,
+  });
+  page.drawText("Traslada estos datos a los campos en blanco/puntos del formulario oficial", {
+    x: margin + 12, y: y - 47, size: 9, font: fontRegular, color: DARK,
+  });
+  page.drawText("(a mano, o con un editor de PDF) antes de firmarlo.", {
+    x: margin + 12, y: y - 61, size: 9, font: fontRegular, color: DARK,
+  });
+  y -= 100;
+
+  drawNote("DATOS DEL EVENTO", 10.5, NAVY, fontBold);
+  drawField("Cliente final", event.clientName);
+  drawField("Ubicación", `${event.venue}, ${event.location}`);
+  drawField("Fecha", event.date);
+  drawField("Horario", event.time);
+  drawField("Funciones", event.functions);
+  drawField("Retribución bruta pactada", `${event.budget} €`);
+  y -= 12;
+
+  drawNote("DATOS DE LA TRABAJADORA", 10.5, NAVY, fontBold);
+  drawField("Nombre", profile.name);
+  drawField("Edad", `${profile.age} años`);
+  drawField("Ciudad", profile.city);
+  y -= 12;
+
+  drawNote("DATOS DE LA EMPRESA", 10.5, NAVY, fontBold);
+  drawField("Razón social", "[COMPLETAR — NOMBRE COMERCIAL / RAZÓN SOCIAL]");
+  drawField("NIF/CIF", "[COMPLETAR]");
+  y -= 12;
+
+  drawField("Documento generado el", today);
+
+  page.drawText(
+    "A partir de aquí: páginas 1, 2, 3, 13 y 22 del modelo oficial \"Contrato de Trabajo Temporal\" del SEPE (www.sepe.es).",
+    { x: margin, y: 40, size: 7.5, font: fontRegular, color: GREY }
   );
 
-  return doc;
+  // ---------- Páginas reales del SEPE, copiadas sin alterar ----------
+  const officialPageIndices = baseDoc.getPageIndices();
+  const copiedPages = await outDoc.copyPages(baseDoc, officialPageIndices);
+  copiedPages.forEach((p) => outDoc.addPage(p));
+
+  return outDoc;
 }
 
 function ContractPreview({ event, profile, onClose }) {
@@ -255,10 +257,19 @@ function ContractPreview({ event, profile, onClose }) {
     setDownloading(true);
     setPdfError("");
     try {
-      const { jsPDF } = await loadJsPDF();
-      const doc = buildContractPdf({ jsPDF, event, profile, today });
+      const PDFLib = await loadPdfLib();
+      const outDoc = await buildOfficialContractPdf({ PDFLib, event, profile, today });
+      const bytes = await outDoc.save();
+      const blob = new Blob([bytes], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
       const safeName = `${event.venue}_${profile.name}`.replace(/[^a-zA-Z0-9]+/g, "_");
-      doc.save(`Contrato_${safeName}.pdf`);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Contrato_Oficial_${safeName}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     } catch (err) {
       console.error(err);
       setPdfError("No se pudo generar el PDF. Comprueba tu conexión e inténtalo de nuevo.");
@@ -273,25 +284,38 @@ function ContractPreview({ event, profile, onClose }) {
         <div className="p-5 flex items-center justify-between border-b" style={{ borderColor: "#E5E0D3" }}>
           <div className="flex items-center gap-2">
             <FileText size={18} style={{ color: "#B8860B" }} />
-            <h3 className="font-display text-lg" style={{ color: "#1B2A4A" }}>Anexo I + Contrato generado</h3>
+            <h3 className="font-display text-lg" style={{ color: "#1B2A4A" }}>Anexo I + Contrato de trabajo generado</h3>
           </div>
           <button onClick={onClose} className="text-stone-400 hover:text-stone-600"><X size={20} /></button>
         </div>
         <div className="p-6 font-body text-sm text-stone-700 leading-relaxed space-y-4">
           <p className="text-xs uppercase tracking-wide font-semibold" style={{ color: "#B8860B" }}>Anexo I — Datos del evento</p>
           <div className="rounded-lg p-4 space-y-1.5" style={{ backgroundColor: "#FBF9F4" }}>
-            <p><strong>Cliente:</strong> {event.clientName}</p>
+            <p><strong>Cliente final:</strong> {event.clientName}</p>
             <p><strong>Ubicación:</strong> {event.venue}, {event.location}</p>
             <p><strong>Fecha:</strong> {event.date} · <strong>Horario:</strong> {event.time}</p>
             <p><strong>Funciones:</strong> {event.functions}</p>
-            <p><strong>Precio pactado:</strong> {event.budget} € (IVA no incluido)</p>
+            <p><strong>Salario bruto pactado:</strong> {event.budget} € (antes de retenciones)</p>
           </div>
 
-          <p className="text-xs uppercase tracking-wide font-semibold pt-2" style={{ color: "#B8860B" }}>Contrato de prestación de servicios</p>
-          <p>En Madrid, a {today}, de una parte <strong>{profile.name}</strong>, mayor de edad, en su condición de trabajadora autónoma, en adelante "la Profesional"; de otra, <strong>{event.clientName}</strong>, en adelante "el Cliente".</p>
-          <p><strong>Artículo 1. Objeto.</strong> La Profesional se obliga a prestar al Cliente el servicio descrito en el Anexo I, a cambio del precio allí pactado.</p>
-          <p><strong>Artículo 2. Naturaleza mercantil.</strong> La Profesional presta sus servicios con plena autonomía e independencia organizativa, sin sujeción a horario impuesto más allá de la duración del evento, por lo que este contrato tiene naturaleza de arrendamiento de servicios (arts. 1544 y ss. Código Civil).</p>
-          <p><strong>Artículo 3. Pago.</strong> El Cliente abonará el importe pactado contra factura emitida por la Profesional. La comisión de intermediación de la Plataforma se factura de forma independiente.</p>
+          <p className="text-xs uppercase tracking-wide font-semibold pt-2" style={{ color: "#B8860B" }}>Contrato de trabajo — Artista de un día (RD 1435/1985)</p>
+          <p>En Madrid, a {today}.</p>
+          <p className="font-semibold" style={{ color: "#1B2A4A" }}>REUNIDOS</p>
+          <p>De una parte, <strong>[NOMBRE COMERCIAL / RAZÓN SOCIAL DE LA EMPRESA]</strong>, con NIF/CIF [NIF/CIF], en su condición de empleadora, en adelante "la Empresa".</p>
+          <p>De otra parte, <strong>{profile.name}</strong>, mayor de edad, con NIF [NIF] y número de afiliación a la Seguridad Social [NAF], en adelante "la Trabajadora".</p>
+          <p>Ambas partes se reconocen mutua capacidad legal para contratar y, a tal efecto,</p>
+          <p className="font-semibold" style={{ color: "#1B2A4A" }}>EXPONEN</p>
+          <p>Que la Empresa ha sido contratada por <strong>{event.clientName}</strong> para prestar el servicio descrito en el Anexo I, y que necesita para ello los servicios profesionales de la Trabajadora para el evento correspondiente.</p>
+          <p>Y en su virtud, ACUERDAN suscribir el presente contrato de trabajo especial de artistas en espectáculos públicos, con arreglo a las siguientes:</p>
+
+          <p><strong>Artículo 1. Objeto y régimen jurídico.</strong> La Trabajadora prestará a la Empresa el servicio descrito en el Anexo I, bajo la relación laboral especial de artistas en espectáculos públicos regulada por el Real Decreto 1435/1985, de 1 de agosto.</p>
+          <p><strong>Artículo 2. Duración.</strong> El presente contrato tiene una duración de un (1) día, coincidente con la fecha del evento. La Trabajadora queda dada de alta en el régimen correspondiente de la Seguridad Social desde el inicio de la jornada y de baja a su finalización.</p>
+          <p><strong>Artículo 3. Retribución.</strong> La Trabajadora percibirá la cantidad indicada en el Anexo I en concepto de salario bruto, sobre la que se aplicarán las retenciones de IRPF y cotizaciones a la Seguridad Social legalmente establecidas. La Empresa hará entrega de la nómina correspondiente en el plazo legal.</p>
+          <p><strong>Artículo 4. Cancelaciones.</strong> En caso de cancelación del evento por causas ajenas a la Trabajadora con menos de 48-72 horas de antelación, la Empresa abonará la compensación pactada. En caso de que la Trabajadora no pueda acudir tras confirmar, deberá comunicarlo con la mayor antelación posible.</p>
+          <p><strong>Artículo 5. Obligaciones de la Trabajadora.</strong> Prestar el servicio con la diligencia profesional habitual; cumplir el horario y ubicación pactados; respetar el código de conducta e imagen razonablemente exigido para el evento.</p>
+          <p><strong>Artículo 6. Obligaciones de la Empresa.</strong> Dar de alta a la Trabajadora en la Seguridad Social antes del inicio de la jornada; facilitar las condiciones adecuadas para la prestación del servicio; abonar la retribución pactada y emitir la nómina en el plazo legal.</p>
+          <p><strong>Artículo 7. Protección de datos e imagen.</strong> La Empresa se compromete a utilizar cualquier imagen o dato personal de la Trabajadora exclusivamente para los fines aquí previstos, respetando la Ley Orgánica 1/1982 y la normativa de protección de datos.</p>
+          <p><strong>Artículo 8. Legislación y jurisdicción.</strong> Este contrato se rige por el Real Decreto 1435/1985 y demás normativa laboral española aplicable. Para cualquier controversia, ambas partes se someten a los Juzgados de lo Social de Madrid capital.</p>
           <p className="text-xs text-stone-400 pt-2">Documento generado automáticamente a partir de la plantilla legal del proyecto. Requiere firma de ambas partes para su validez.</p>
         </div>
         <div className="p-5 border-t flex flex-col gap-2" style={{ borderColor: "#E5E0D3" }}>
@@ -310,7 +334,7 @@ function ContractPreview({ event, profile, onClose }) {
               className="flex items-center gap-2 font-body text-sm font-semibold px-5 py-2.5 rounded-full text-white disabled:opacity-60"
               style={{ backgroundColor: "#B8860B" }}
             >
-              <FileText size={14} /> {downloading ? "Generando PDF…" : "Descargar PDF"}
+              <FileText size={14} /> {downloading ? "Generando PDF…" : "Descargar contrato oficial"}
             </button>
           </div>
         </div>
