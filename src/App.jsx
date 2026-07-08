@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   Sparkles, MapPin, Calendar, Clock, Euro, Users, ArrowRight, Check,
-  FileText, X, ChevronLeft, Star, Building2, UserRound, Ticket, Send
+  FileText, X, ChevronLeft, Star, Building2, UserRound, Ticket, Send, Lock, Camera
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -21,8 +21,8 @@ const FONTS = (
 );
 
 const seedProfiles = [
-  { id: "p1", name: "Carla M.", age: 24, city: "Madrid", rate: 25, bio: "3 años de experiencia en imagen para discotecas del centro." },
-  { id: "p2", name: "Elena R.", age: 27, city: "Madrid", rate: 30, bio: "Azafata de eventos corporativos, inglés C1." },
+  { id: "p1", name: "Carla M.", age: 24, city: "Madrid", rate: 25, bio: "3 años de experiencia en imagen para discotecas del centro.", photo: null },
+  { id: "p2", name: "Elena R.", age: 27, city: "Madrid", rate: 30, bio: "Azafata de eventos corporativos, inglés C1.", photo: null },
 ];
 
 const seedEvents = [
@@ -42,11 +42,12 @@ const seedEvents = [
   },
 ];
 
-const TYPE_LABEL = { discoteca: "Discoteca", corporativo: "Evento corporativo", private: "Private party" };
+const TYPE_LABEL = { discoteca: "Discoteca", corporativo: "Evento corporativo", private: "Private party", vip: "VIP / Privado" };
 const TYPE_COLOR = {
   discoteca: { bg: "#DCEFEF", text: "#0F6E6E", border: "#0F6E6E" },
   corporativo: { bg: "#E9EDF4", text: "#1B2A4A", border: "#1B2A4A" },
   private: { bg: "#F5E6C8", text: "#8A6205", border: "#B8860B" },
+  vip: { bg: "#1B2A4A", text: "#FFFFFF", border: "#1B2A4A" },
 };
 
 function TicketDivider() {
@@ -71,20 +72,87 @@ function Badge({ children, type }) {
   );
 }
 
-function EventTicket({ event, profiles, children }) {
+function readAndResizeImage(file, maxSize = 480, quality = 0.75) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("No se pudo leer la imagen"));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("No se pudo procesar la imagen"));
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > height && width > maxSize) {
+          height = Math.round((height * maxSize) / width);
+          width = maxSize;
+        } else if (height > maxSize) {
+          width = Math.round((width * maxSize) / height);
+          height = maxSize;
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function Avatar({ name, photo, size = 40 }) {
+  const initials = (name || "?").trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+  if (photo) {
+    return (
+      <img
+        src={photo}
+        alt={name}
+        className="rounded-full object-cover flex-shrink-0"
+        style={{ width: size, height: size, border: "1px solid #E5E0D3" }}
+      />
+    );
+  }
+  return (
+    <div
+      className="rounded-full flex items-center justify-center flex-shrink-0 font-body font-semibold"
+      style={{ width: size, height: size, backgroundColor: "#1B2A4A", color: "#F5E6C8", fontSize: size * 0.38 }}
+    >
+      {initials}
+    </div>
+  );
+}
+
+function EventTicket({ event, profiles, children, revealed = true }) {
   const c = TYPE_COLOR[event.type];
+  const isMasked = event.confidential && !revealed;
   return (
     <div className="rounded-2xl overflow-hidden shadow-sm border" style={{ borderColor: "#E5E0D3" }}>
       <div className="p-5" style={{ backgroundColor: "#FFFFFF" }}>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <Badge type={event.type}>{TYPE_LABEL[event.type]}</Badge>
-            <h3 className="font-display text-xl mt-2" style={{ color: "#1B2A4A" }}>{event.venue}</h3>
-            <p className="font-body text-sm text-stone-500">{event.clientName}</p>
+            <div className="flex items-center gap-2">
+              <Badge type={event.type}>{TYPE_LABEL[event.type]}</Badge>
+              {event.confidential && (
+                <span className="flex items-center gap-1 font-body text-[10px] font-semibold uppercase tracking-wide" style={{ color: "#B8860B" }}>
+                  <Lock size={11} /> Confidencial
+                </span>
+              )}
+            </div>
+            <h3 className="font-display text-xl mt-2" style={{ color: "#1B2A4A" }}>
+              {isMasked ? "Evento privado" : event.venue}
+            </h3>
+            <p className="font-body text-sm text-stone-500">
+              {isMasked ? "Detalles disponibles solo por invitación" : event.clientName}
+            </p>
           </div>
           <div className="text-right font-body">
-            <div className="flex items-center gap-1 justify-end text-sm font-semibold" style={{ color: c.text }}>
-              <Euro size={14} /> {event.budget}/evento
+            <div className="flex items-center gap-1 justify-end text-sm font-semibold" style={{ color: c.text === "#FFFFFF" ? "#1B2A4A" : c.text }}>
+              {isMasked || !event.budget ? (
+                <span className="text-stone-400 italic text-xs">A negociar</span>
+              ) : (
+                <><Euro size={14} /> {event.budget}/evento</>
+              )}
             </div>
             <p className="text-xs text-stone-400 mt-0.5">{event.spots} plazas</p>
           </div>
@@ -93,9 +161,14 @@ function EventTicket({ event, profiles, children }) {
         <div className="mt-4 grid grid-cols-2 gap-y-2 font-body text-sm text-stone-600">
           <div className="flex items-center gap-1.5"><Calendar size={14} className="text-stone-400" /> {event.date}</div>
           <div className="flex items-center gap-1.5"><Clock size={14} className="text-stone-400" /> {event.time}</div>
-          <div className="flex items-center gap-1.5 col-span-2"><MapPin size={14} className="text-stone-400" /> {event.location}</div>
+          <div className="flex items-center gap-1.5 col-span-2">
+            <MapPin size={14} className="text-stone-400" />
+            {isMasked ? "Ubicación se confirma tras selección" : event.location}
+          </div>
         </div>
-        <p className="font-body text-sm text-stone-500 mt-3 leading-relaxed">{event.functions}</p>
+        <p className="font-body text-sm text-stone-500 mt-3 leading-relaxed">
+          {isMasked ? "Este evento requiere discreción. Aplica y, si tu perfil encaja, recibirás el resto de detalles directamente." : event.functions}
+        </p>
       </div>
 
       <div className="px-5"><TicketDivider /></div>
@@ -136,6 +209,35 @@ function StepFlow({ active }) {
       ))}
     </div>
   );
+}
+
+function loadJsPDF() {
+  return new Promise((resolve, reject) => {
+    if (window.jspdf) return resolve(window.jspdf);
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+    script.onload = () => resolve(window.jspdf);
+    script.onerror = () => reject(new Error("No se pudo cargar el generador de PDF"));
+    document.head.appendChild(script);
+  });
+}
+
+// Parte un texto en líneas que caben en un ancho máximo (pdf-lib no lo hace de forma nativa).
+function wrapText(text, font, size, maxWidth) {
+  const words = String(text).split(/\s+/);
+  const lines = [];
+  let current = "";
+  words.forEach((word) => {
+    const test = current ? current + " " + word : word;
+    if (font.widthOfTextAtSize(test, size) > maxWidth && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = test;
+    }
+  });
+  if (current) lines.push(current);
+  return lines;
 }
 
 function loadPdfLib() {
@@ -214,7 +316,7 @@ async function buildOfficialContractPdf({ PDFLib, event, profile, today }) {
   y -= 100;
 
   drawNote("DATOS DEL EVENTO", 10.5, NAVY, fontBold);
-  drawField("Cliente final", event.clientName);
+  drawField("Cliente final", event.billingEntity || event.clientName);
   drawField("Ubicación", `${event.venue}, ${event.location}`);
   drawField("Fecha", event.date);
   drawField("Horario", event.time);
@@ -245,12 +347,187 @@ async function buildOfficialContractPdf({ PDFLib, event, profile, today }) {
   const copiedPages = await outDoc.copyPages(baseDoc, officialPageIndices);
   copiedPages.forEach((p) => outDoc.addPage(p));
 
+  // ---------------------------------------------------------------------
+  // Relleno automático de los huecos del formulario oficial (no manual).
+  // Coordenadas obtenidas del propio PDF original (595.28 x 841.89 pt).
+  // ---------------------------------------------------------------------
+  const [startTime, endTime] = (event.time || "").split("-").map((s) => s.trim());
+  const eventDateStr = event.date || "";
+  const fillColor = rgb(27 / 255, 42 / 255, 74 / 255);
+  const fillFont = fontRegular;
+  const fillSize = 8.5;
+
+  // Página 1 del formulario oficial (Cláusulas PRIMERA-CUARTA): copiedPages[0]
+  const page1 = copiedPages[0];
+  const page1H = page1.getHeight();
+  // SEGUNDA — horario: "...prestadas de ___, a ___,"
+  if (startTime) page1.drawText(startTime, { x: 440, y: page1H - 635 - 8, size: fillSize, font: fillFont, color: fillColor });
+  if (endTime) page1.drawText(endTime, { x: 79, y: page1H - 645 - 8, size: fillSize, font: fillFont, color: fillColor });
+  // TERCERA — duración: "...se extenderá desde ___, hasta ___."
+  if (eventDateStr) {
+    page1.drawText(eventDateStr, { x: 291, y: page1H - 714 - 9, size: fillSize, font: fillFont, color: fillColor });
+    page1.drawText(eventDateStr, { x: 423, y: page1H - 714 - 9, size: fillSize, font: fillFont, color: fillColor });
+  }
+  // CUARTA — retribución: "...percibirá una retribución total de ___ euros brutos..."
+  if (event.budget) {
+    page1.drawText(String(event.budget), { x: 264, y: page1H - 743 - 9, size: fillSize, font: fillFont, color: fillColor });
+  }
+
+  // Página 4 del extracto (cláusula específica artística, original pág. 13): copiedPages[3]
+  const page4 = copiedPages[3];
+  const page4H = page4.getHeight();
+  const causa = `Prestación del servicio de imagen/azafata para el evento organizado por ${event.billingEntity || event.clientName} en ${event.venue}.`;
+  const causaWrapped = wrapText(causa, fillFont, fillSize, 330);
+  causaWrapped.forEach((line, i) => {
+    page4.drawText(line, { x: 200, y: page4H - 362.3 - 9 - i * 11, size: fillSize, font: fillFont, color: fillColor });
+  });
+  const duracionTexto = `Un (1) día — ${eventDateStr}${startTime ? `, de ${startTime} a ${endTime || "fin del evento"}` : ""}.`;
+  page4.drawText(duracionTexto, { x: 192, y: page4H - 388.3 - 9, size: fillSize, font: fillFont, color: fillColor });
+  // Marca "Personal Técnico y Auxiliar" (categoría aplicable a modelos/azafatas de imagen)
+  page4.drawText("X", { x: 72, y: page4H - 454.5 - 9, size: 10, font: fontBold, color: fillColor });
+  if (event.functions) {
+    const funcWrapped = wrapText(event.functions, fillFont, fillSize, 450);
+    funcWrapped.slice(0, 2).forEach((line, i) => {
+      page4.drawText(line, { x: 95, y: page4H - 486.3 - 9 - i * 11, size: fillSize, font: fillFont, color: fillColor });
+    });
+  }
+
   return outDoc;
+}
+
+
+// Genera el Acuerdo de Confidencialidad (NDA), adaptado del modelo oficial
+// de la Oficina Española de Patentes y Marcas (OEPM), para eventos confidenciales.
+function buildConfidentialityPdf({ jsPDF, event, profile, today }) {
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const pageW = doc.internal.pageSize.getWidth();
+  const margin = 48;
+  const contentW = pageW - margin * 2;
+  let y = 56;
+
+  const NAVY = [27, 42, 74];
+  const GOLD = [184, 134, 11];
+  const GREY = [90, 90, 90];
+  const DARK = [40, 40, 40];
+
+  function ensureSpace(needed) {
+    if (y + needed > 780) {
+      doc.addPage();
+      y = 56;
+    }
+  }
+  function renderParagraph(text, opts = {}) {
+    doc.setFont("helvetica", opts.bold ? "bold" : "normal");
+    doc.setFontSize(opts.size || 9.5);
+    doc.setTextColor(...(opts.color || DARK));
+    const wrapped = doc.splitTextToSize(text, contentW);
+    ensureSpace(wrapped.length * 13 + 6);
+    doc.text(wrapped, margin, y);
+    y += wrapped.length * 13 + (opts.spaceAfter ?? 10);
+  }
+  function renderClauseTitle(text) {
+    ensureSpace(20);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(...NAVY);
+    doc.text(text, margin, y);
+    y += 16;
+  }
+  function renderBullets(items) {
+    items.forEach((item) => {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      doc.setTextColor(...DARK);
+      const wrapped = doc.splitTextToSize(item, contentW - 16);
+      ensureSpace(wrapped.length * 13 + 4);
+      doc.text("•", margin, y);
+      doc.text(wrapped, margin + 14, y);
+      y += wrapped.length * 13 + 4;
+    });
+    y += 4;
+  }
+
+  doc.setFillColor(...NAVY);
+  doc.rect(0, 0, pageW, 70, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("times", "bold");
+  doc.setFontSize(17);
+  doc.text("Acuerdo de Confidencialidad", margin, 32);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text("Adaptado del modelo oficial de la Oficina Española de Patentes y Marcas (OEPM)", margin, 50);
+  y = 100;
+
+  const empresa = event.billingEntity || "[NOMBRE COMERCIAL / RAZÓN SOCIAL DE LA EMPRESA]";
+
+  renderParagraph(`En Madrid, a ${today}`, { spaceAfter: 8 });
+  renderParagraph("REUNIDOS", { bold: true, color: NAVY, spaceAfter: 8 });
+  renderParagraph(`De una parte, ${empresa}, en adelante "la Empresa".`);
+  renderParagraph(`De otra parte, ${profile.name}, mayor de edad, con NIF [NIF], en adelante "la Profesional".`);
+  renderParagraph('La Empresa y la Profesional recibirán la denominación de "la Parte" por separado y "las Partes" de forma conjunta.');
+  renderParagraph("MANIFIESTAN", { bold: true, color: NAVY, spaceAfter: 8 });
+  renderParagraph(`I. Que la Empresa opera una plataforma de contratación de profesionales de imagen y azafatas para eventos.`);
+  renderParagraph(`II. Que la Profesional ha sido contratada para el evento organizado en ${event.venue}, ${event.location}, el ${event.date}, en los términos del contrato de trabajo suscrito entre ambas partes.`);
+  renderParagraph("III. Que, con motivo de dicho evento, la Profesional podrá tener acceso a información relativa a la identidad de los asistentes, la ubicación y otros detalles de carácter privado.");
+  renderParagraph("IV. Que las Partes desean proteger dicha información de su uso y divulgación no autorizados, y a tal efecto firman el presente Acuerdo, con arreglo a las siguientes:", { spaceAfter: 14 });
+  renderParagraph("CLÁUSULAS", { bold: true, color: GOLD, size: 11, spaceAfter: 10 });
+
+  renderClauseTitle("1. Objeto");
+  renderParagraph("Este Acuerdo regula el tratamiento de la Información Confidencial a la que la Profesional tenga acceso con motivo de su prestación de servicios en el evento.");
+
+  renderClauseTitle("2. Definición de Información Confidencial");
+  renderParagraph('Se entiende por "Información Confidencial" la identidad de los asistentes, organizadores y anfitriones; la ubicación y detalles logísticos del evento; cualquier imagen, grabación o situación presenciada durante el mismo; y cualquier dato personal o de contexto de los asistentes.');
+
+  renderClauseTitle("3. Obligaciones de la Profesional");
+  renderBullets([
+    "Utilizar la Información Confidencial de forma reservada.",
+    "No divulgar ni comunicar la Información Confidencial a terceros, incluyendo otras profesionales, amistades o familiares.",
+    "No captar fotografías ni grabaciones de audio o vídeo del evento, salvo autorización expresa y por escrito de la Empresa.",
+    "No publicar ni insinuar en redes sociales o cualquier medio información relativa al evento.",
+    "Utilizar la Información Confidencial exclusivamente para la correcta prestación de su servicio.",
+  ]);
+
+  renderClauseTitle("4. Excepciones");
+  renderParagraph("La Profesional podrá usar o difundir información que sea de conocimiento público sin mediar incumplimiento, que ya conociera con anterioridad, o que deba comunicar por requerimiento legal o judicial, notificándolo a la Empresa con la mayor antelación posible.");
+
+  renderClauseTitle("5. Propiedad de la información");
+  renderParagraph("La Información Confidencial es de propiedad exclusiva de la Empresa y del Cliente del evento. Este Acuerdo no supone cesión ni licencia de derechos sobre la misma.");
+
+  renderClauseTitle("6. Duración");
+  renderParagraph("Las obligaciones de confidencialidad tienen carácter indefinido y continuarán en vigor incluso tras la finalización de la relación laboral, hasta que la información sea de dominio público sin que medie incumplimiento de la Profesional.");
+
+  renderClauseTitle("7. Incumplimiento");
+  renderParagraph("La Empresa tendrá derecho a reclamar ante los tribunales competentes una indemnización por los daños y perjuicios causados por la divulgación o uso no autorizado de la Información Confidencial, sin perjuicio de la cláusula penal que, en su caso, se pacte en el Anexo II.");
+
+  renderClauseTitle("8. Ley aplicable y jurisdicción");
+  renderParagraph("Este Acuerdo se rige por la legislación española. Para cualquier controversia, ambas partes se someten a los Juzgados y Tribunales de Madrid capital.", { spaceAfter: 20 });
+
+  renderParagraph("Y en prueba de conformidad, firman el presente Acuerdo por duplicado y a un solo efecto en el lugar y fecha indicados.", { spaceAfter: 40 });
+
+  ensureSpace(40);
+  doc.setDrawColor(...GREY);
+  doc.line(margin, y, margin + 180, y);
+  doc.line(pageW - margin - 180, y, pageW - margin, y);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...GREY);
+  doc.text("La Profesional", margin, y + 14);
+  doc.text("La Empresa", pageW - margin - 180, y + 14);
+
+  doc.setFontSize(7.5);
+  doc.setTextColor(...GREY);
+  doc.text(
+    "Adaptado del modelo oficial de la OEPM (www.oepm.es). Se recomienda asesoramiento legal para su adaptación definitiva.",
+    margin, 812
+  );
+
+  return doc;
 }
 
 function ContractPreview({ event, profile, onClose }) {
   const today = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
   const [downloading, setDownloading] = useState(false);
+  const [downloadingNda, setDownloadingNda] = useState(false);
   const [pdfError, setPdfError] = useState("");
 
   async function handleDownload() {
@@ -278,6 +555,22 @@ function ContractPreview({ event, profile, onClose }) {
     }
   }
 
+  async function handleDownloadNda() {
+    setDownloadingNda(true);
+    setPdfError("");
+    try {
+      const { jsPDF } = await loadJsPDF();
+      const doc = buildConfidentialityPdf({ jsPDF, event, profile, today });
+      const safeName = `${event.venue}_${profile.name}`.replace(/[^a-zA-Z0-9]+/g, "_");
+      doc.save(`Confidencialidad_${safeName}.pdf`);
+    } catch (err) {
+      console.error(err);
+      setPdfError("No se pudo generar el PDF. Comprueba tu conexión e inténtalo de nuevo.");
+    } finally {
+      setDownloadingNda(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(27,42,74,0.55)" }}>
       <div className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-2xl">
@@ -291,7 +584,7 @@ function ContractPreview({ event, profile, onClose }) {
         <div className="p-6 font-body text-sm text-stone-700 leading-relaxed space-y-4">
           <p className="text-xs uppercase tracking-wide font-semibold" style={{ color: "#B8860B" }}>Anexo I — Datos del evento</p>
           <div className="rounded-lg p-4 space-y-1.5" style={{ backgroundColor: "#FBF9F4" }}>
-            <p><strong>Cliente final:</strong> {event.clientName}</p>
+            <p><strong>Cliente final:</strong> {event.billingEntity || event.clientName}</p>
             <p><strong>Ubicación:</strong> {event.venue}, {event.location}</p>
             <p><strong>Fecha:</strong> {event.date} · <strong>Horario:</strong> {event.time}</p>
             <p><strong>Funciones:</strong> {event.functions}</p>
@@ -305,7 +598,7 @@ function ContractPreview({ event, profile, onClose }) {
           <p>De otra parte, <strong>{profile.name}</strong>, mayor de edad, con NIF [NIF] y número de afiliación a la Seguridad Social [NAF], en adelante "la Trabajadora".</p>
           <p>Ambas partes se reconocen mutua capacidad legal para contratar y, a tal efecto,</p>
           <p className="font-semibold" style={{ color: "#1B2A4A" }}>EXPONEN</p>
-          <p>Que la Empresa ha sido contratada por <strong>{event.clientName}</strong> para prestar el servicio descrito en el Anexo I, y que necesita para ello los servicios profesionales de la Trabajadora para el evento correspondiente.</p>
+          <p>Que la Empresa ha sido contratada por <strong>{event.billingEntity || event.clientName}</strong> para prestar el servicio descrito en el Anexo I, y que necesita para ello los servicios profesionales de la Trabajadora para el evento correspondiente.</p>
           <p>Y en su virtud, ACUERDAN suscribir el presente contrato de trabajo especial de artistas en espectáculos públicos, con arreglo a las siguientes:</p>
 
           <p><strong>Artículo 1. Objeto y régimen jurídico.</strong> La Trabajadora prestará a la Empresa el servicio descrito en el Anexo I, bajo la relación laboral especial de artistas en espectáculos públicos regulada por el Real Decreto 1435/1985, de 1 de agosto.</p>
@@ -320,7 +613,7 @@ function ContractPreview({ event, profile, onClose }) {
         </div>
         <div className="p-5 border-t flex flex-col gap-2" style={{ borderColor: "#E5E0D3" }}>
           {pdfError && <p className="text-xs font-body" style={{ color: "#C0392B" }}>{pdfError}</p>}
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 flex-wrap">
             <button
               onClick={onClose}
               className="font-body text-sm font-semibold px-5 py-2.5 rounded-full"
@@ -328,6 +621,16 @@ function ContractPreview({ event, profile, onClose }) {
             >
               Cerrar
             </button>
+            {event.confidential && (
+              <button
+                onClick={handleDownloadNda}
+                disabled={downloadingNda}
+                className="flex items-center gap-2 font-body text-sm font-semibold px-5 py-2.5 rounded-full disabled:opacity-60"
+                style={{ color: "#1B2A4A", border: "1px solid #1B2A4A" }}
+              >
+                <Lock size={14} /> {downloadingNda ? "Generando…" : "Descargar Confidencialidad"}
+              </button>
+            )}
             <button
               onClick={handleDownload}
               disabled={downloading}
@@ -350,10 +653,13 @@ export default function App() {
   const [events, setEvents] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [myProfileId, setMyProfileId] = useState(null);
-  const [registerForm, setRegisterForm] = useState({ name: "", age: "", city: "Madrid", rate: "", bio: "" });
+  const [registerForm, setRegisterForm] = useState({ name: "", age: "", city: "Madrid", rate: "", bio: "", photo: null });
+  const [photoError, setPhotoError] = useState("");
+  const [photoLoading, setPhotoLoading] = useState(false);
   const [eventForm, setEventForm] = useState({
     clientName: "", type: "discoteca", venue: "", date: "", time: "",
     location: "", budget: "", spots: "1", functions: "",
+    confidential: false, billingEntity: "",
   });
   const [contractView, setContractView] = useState(null); // { event, profile }
   const [toast, setToast] = useState("");
@@ -409,6 +715,10 @@ export default function App() {
   function handleRegister(e) {
     e.preventDefault();
     if (!registerForm.name || !registerForm.age || !registerForm.rate) return;
+    if (!registerForm.photo) {
+      setPhotoError("Sube una foto de perfil para continuar — es lo primero que verán los Clientes.");
+      return;
+    }
     const id = "p" + Date.now();
     const newProfile = { id, ...registerForm, age: Number(registerForm.age), rate: Number(registerForm.rate) };
     const next = [...profiles, newProfile];
@@ -418,15 +728,30 @@ export default function App() {
     flash("Perfil creado y guardado. Ya puedes aplicar a eventos.");
   }
 
+  async function handlePhotoChange(file) {
+    if (!file) return;
+    setPhotoError("");
+    setPhotoLoading(true);
+    try {
+      const dataUrl = await readAndResizeImage(file);
+      setRegisterForm((f) => ({ ...f, photo: dataUrl }));
+    } catch (err) {
+      console.error(err);
+      setPhotoError("No se pudo procesar la foto. Prueba con otra imagen.");
+    } finally {
+      setPhotoLoading(false);
+    }
+  }
+
   function handlePostEvent(e) {
     e.preventDefault();
     if (!eventForm.clientName || !eventForm.venue || !eventForm.date) return;
     const id = "e" + Date.now();
-    const next = [{ id, ...eventForm, budget: Number(eventForm.budget), spots: Number(eventForm.spots), applicants: [], selected: null }, ...events];
+    const next = [{ id, ...eventForm, budget: eventForm.budget ? Number(eventForm.budget) : null, spots: Number(eventForm.spots), applicants: [], selected: null }, ...events];
     setEvents(next);
-    setEventForm({ clientName: "", type: "discoteca", venue: "", date: "", time: "", location: "", budget: "", spots: "1", functions: "" });
+    setEventForm({ clientName: "", type: "discoteca", venue: "", date: "", time: "", location: "", budget: "", spots: "1", functions: "", confidential: false, billingEntity: "" });
     persist(undefined, next);
-    flash("Evento publicado y guardado.");
+    flash(eventForm.confidential ? "Evento privado publicado — solo visible por invitación." : "Evento publicado y guardado.");
   }
 
   function applyToEvent(eventId) {
@@ -513,17 +838,49 @@ export default function App() {
             <h2 className="font-display text-xl mb-4" style={{ color: "#1B2A4A" }}>Publicar evento</h2>
             <form onSubmit={handlePostEvent} className="grid sm:grid-cols-2 gap-3">
               <Input label="Nombre del cliente / local" value={eventForm.clientName} onChange={(v) => setEventForm({ ...eventForm, clientName: v })} />
-              <Select label="Tipo" value={eventForm.type} onChange={(v) => setEventForm({ ...eventForm, type: v })}
-                options={[["discoteca", "Discoteca"], ["corporativo", "Evento corporativo"], ["private", "Private party (premium)"]]} />
+              <Select label="Tipo" value={eventForm.type}
+                onChange={(v) => setEventForm({ ...eventForm, type: v, confidential: v === "vip" ? true : eventForm.confidential })}
+                options={[["discoteca", "Discoteca"], ["corporativo", "Evento corporativo"], ["private", "Private party (premium)"], ["vip", "VIP / Privado (a medida)"]]} />
               <Input label="Nombre del evento / venue" value={eventForm.venue} onChange={(v) => setEventForm({ ...eventForm, venue: v })} />
               <Input label="Ubicación" value={eventForm.location} onChange={(v) => setEventForm({ ...eventForm, location: v })} />
               <Input label="Fecha" type="date" value={eventForm.date} onChange={(v) => setEventForm({ ...eventForm, date: v })} />
               <Input label="Horario" placeholder="23:00 - 05:00" value={eventForm.time} onChange={(v) => setEventForm({ ...eventForm, time: v })} />
-              <Input label="Presupuesto por persona (€)" type="number" value={eventForm.budget} onChange={(v) => setEventForm({ ...eventForm, budget: v })} />
+              <Input
+                label={eventForm.type === "vip" ? "Presupuesto (opcional, a negociar)" : "Presupuesto por persona (€)"}
+                type="number" value={eventForm.budget} onChange={(v) => setEventForm({ ...eventForm, budget: v })}
+              />
               <Input label="Plazas" type="number" value={eventForm.spots} onChange={(v) => setEventForm({ ...eventForm, spots: v })} />
               <div className="sm:col-span-2">
                 <Textarea label="Funciones a desempeñar" value={eventForm.functions} onChange={(v) => setEventForm({ ...eventForm, functions: v })} />
               </div>
+
+              {eventForm.type === "vip" && (
+                <div className="sm:col-span-2 rounded-xl p-4 space-y-3" style={{ backgroundColor: "#F2EFE6" }}>
+                  <div className="flex items-center gap-2">
+                    <Lock size={14} style={{ color: "#B8860B" }} />
+                    <p className="font-body text-xs font-semibold" style={{ color: "#1B2A4A" }}>Evento confidencial</p>
+                  </div>
+                  <label className="flex items-start gap-2 font-body text-xs text-stone-600">
+                    <input
+                      type="checkbox"
+                      checked={eventForm.confidential}
+                      onChange={(e) => setEventForm({ ...eventForm, confidential: e.target.checked })}
+                      className="mt-0.5"
+                    />
+                    Ocultar cliente, ubicación y precio a las Profesionales hasta que yo seleccione manualmente a quién invitar.
+                  </label>
+                  <Input
+                    label="Nombre para factura (si es distinto del cliente, ej. representante o agencia)"
+                    value={eventForm.billingEntity}
+                    onChange={(v) => setEventForm({ ...eventForm, billingEntity: v })}
+                    placeholder="Opcional — se usará en el contrato/factura en vez del nombre del cliente"
+                  />
+                  <p className="font-body text-[11px] text-stone-500 leading-relaxed">
+                    La factura sigue siendo obligatoria siempre. Esto solo cambia a qué nombre se emite (el del cliente o el de su representante/agencia si esa es la vía real de cobro), nunca elimina la factura.
+                  </p>
+                </div>
+              )}
+
               <div className="sm:col-span-2 flex justify-end">
                 <button type="submit" className="flex items-center gap-2 font-body text-sm font-semibold px-5 py-2.5 rounded-full text-white" style={{ backgroundColor: "#1B2A4A" }}>
                   <Send size={14} /> Publicar evento
@@ -559,9 +916,12 @@ export default function App() {
                         if (!p) return null;
                         return (
                           <div key={pid} className="flex items-center justify-between rounded-lg px-3 py-2" style={{ backgroundColor: "#F2EFE6" }}>
-                            <div className="font-body text-sm">
-                              <span className="font-semibold" style={{ color: "#1B2A4A" }}>{p.name}</span>
-                              <span className="text-stone-500"> · {p.age} años · {p.rate} €/evento</span>
+                            <div className="flex items-center gap-3">
+                              <Avatar name={p.name} photo={p.photo} size={36} />
+                              <div className="font-body text-sm">
+                                <span className="font-semibold" style={{ color: "#1B2A4A" }}>{p.name}</span>
+                                <span className="text-stone-500"> · {p.age} años · {p.rate} €/evento</span>
+                              </div>
                             </div>
                             <button
                               onClick={() => selectApplicant(ev.id, pid)}
@@ -596,6 +956,26 @@ export default function App() {
           <h2 className="font-display text-2xl mb-1" style={{ color: "#1B2A4A" }}>Crear perfil</h2>
           <p className="font-body text-sm text-stone-500 mb-6">Verificación de identidad simulada en este prototipo.</p>
           <form onSubmit={handleRegister} className="bg-white rounded-2xl p-6 border space-y-3" style={{ borderColor: "#E5E0D3" }}>
+            <div>
+              <span className="font-body text-xs font-semibold text-stone-500">Foto de perfil</span>
+              <div className="mt-2 flex items-center gap-4">
+                <Avatar name={registerForm.name} photo={registerForm.photo} size={64} />
+                <label
+                  className="flex items-center gap-2 font-body text-xs font-semibold px-4 py-2 rounded-full cursor-pointer"
+                  style={{ color: "#1B2A4A", border: "1px solid #E5E0D3" }}
+                >
+                  <Camera size={14} />
+                  {photoLoading ? "Procesando…" : registerForm.photo ? "Cambiar foto" : "Subir foto"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => handlePhotoChange(e.target.files?.[0])}
+                  />
+                </label>
+              </div>
+              {photoError && <p className="font-body text-xs mt-2" style={{ color: "#C0392B" }}>{photoError}</p>}
+            </div>
             <Input label="Nombre" value={registerForm.name} onChange={(v) => setRegisterForm({ ...registerForm, name: v })} />
             <Input label="Edad" type="number" value={registerForm.age} onChange={(v) => setRegisterForm({ ...registerForm, age: v })} />
             <Input label="Ciudad" value={registerForm.city} onChange={(v) => setRegisterForm({ ...registerForm, city: v })} />
@@ -617,7 +997,7 @@ export default function App() {
   return (
     <div className="min-h-screen font-body" style={{ backgroundColor: "#FBF9F4" }}>
       {FONTS}
-      <Header role="profesional" onBack={() => setRole(null)} name={myProfile.name} saving={saving} />
+      <Header role="profesional" onBack={() => setRole(null)} name={myProfile.name} photo={myProfile.photo} saving={saving} />
       <div className="max-w-3xl mx-auto px-6 py-8 space-y-8">
         <div className="mb-2"><StepFlow active={myEvents.length ? 3 : 2} /></div>
 
@@ -650,7 +1030,7 @@ export default function App() {
             {openEvents.map((ev) => {
               const applied = ev.applicants.includes(myProfile.id);
               return (
-                <EventTicket key={ev.id} event={ev}>
+                <EventTicket key={ev.id} event={ev} revealed={!ev.confidential}>
                   <div className="flex items-center justify-between">
                     <p className="font-body text-xs text-stone-400">{ev.applicants.length} candidata(s) aplicada(s)</p>
                     <button
@@ -674,7 +1054,7 @@ export default function App() {
   );
 }
 
-function Header({ role, onBack, name, saving }) {
+function Header({ role, onBack, name, photo, saving }) {
   return (
     <div className="border-b bg-white" style={{ borderColor: "#E5E0D3" }}>
       <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -686,7 +1066,13 @@ function Header({ role, onBack, name, saving }) {
             {saving ? "Guardando…" : "Guardado"}
           </span>
           <div className="flex items-center gap-2">
-            {role === "cliente" ? <Building2 size={15} style={{ color: "#1B2A4A" }} /> : <UserRound size={15} style={{ color: "#0F6E6E" }} />}
+            {role === "cliente" ? (
+              <Building2 size={15} style={{ color: "#1B2A4A" }} />
+            ) : photo ? (
+              <Avatar name={name} photo={photo} size={22} />
+            ) : (
+              <UserRound size={15} style={{ color: "#0F6E6E" }} />
+            )}
             <span className="font-body text-sm font-semibold" style={{ color: "#1B2A4A" }}>
               {role === "cliente" ? "Panel Cliente" : `Panel Profesional${name ? " · " + name : ""}`}
             </span>
