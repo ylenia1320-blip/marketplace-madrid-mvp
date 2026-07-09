@@ -653,7 +653,7 @@ export default function App() {
   const [events, setEvents] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [myProfileId, setMyProfileId] = useState(null);
-  const [registerForm, setRegisterForm] = useState({ name: "", age: "", city: "Madrid", rate: "", bio: "", photo: null });
+  const [registerForm, setRegisterForm] = useState({ name: "", age: "", city: "Madrid", rate: "", bio: "", photo: null, photos: [], height: "", languages: "" });
   const [photoError, setPhotoError] = useState("");
   const [photoLoading, setPhotoLoading] = useState(false);
   const [eventForm, setEventForm] = useState({
@@ -720,7 +720,12 @@ export default function App() {
       return;
     }
     const id = "p" + Date.now();
-    const newProfile = { id, ...registerForm, age: Number(registerForm.age), rate: Number(registerForm.rate) };
+    const newProfile = {
+      id, ...registerForm,
+      age: Number(registerForm.age),
+      rate: Number(registerForm.rate),
+      height: registerForm.height ? Number(registerForm.height) : null,
+    };
     const next = [...profiles, newProfile];
     setProfiles(next);
     setMyProfileId(id);
@@ -741,6 +746,29 @@ export default function App() {
     } finally {
       setPhotoLoading(false);
     }
+  }
+
+  async function handleGalleryPhotoChange(file) {
+    if (!file) return;
+    if (registerForm.photos.length >= 4) {
+      setPhotoError("Máximo 4 fotos adicionales.");
+      return;
+    }
+    setPhotoError("");
+    setPhotoLoading(true);
+    try {
+      const dataUrl = await readAndResizeImage(file);
+      setRegisterForm((f) => ({ ...f, photos: [...f.photos, dataUrl] }));
+    } catch (err) {
+      console.error(err);
+      setPhotoError("No se pudo procesar la foto. Prueba con otra imagen.");
+    } finally {
+      setPhotoLoading(false);
+    }
+  }
+
+  function removeGalleryPhoto(index) {
+    setRegisterForm((f) => ({ ...f, photos: f.photos.filter((_, i) => i !== index) }));
   }
 
   function handlePostEvent(e) {
@@ -915,21 +943,31 @@ export default function App() {
                         const p = profiles.find(pp => pp.id === pid);
                         if (!p) return null;
                         return (
-                          <div key={pid} className="flex items-center justify-between rounded-lg px-3 py-2" style={{ backgroundColor: "#F2EFE6" }}>
-                            <div className="flex items-center gap-3">
-                              <Avatar name={p.name} photo={p.photo} size={36} />
-                              <div className="font-body text-sm">
-                                <span className="font-semibold" style={{ color: "#1B2A4A" }}>{p.name}</span>
-                                <span className="text-stone-500"> · {p.age} años · {p.rate} €/evento</span>
+                          <div key={pid} className="rounded-lg px-3 py-2 space-y-2" style={{ backgroundColor: "#F2EFE6" }}>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <Avatar name={p.name} photo={p.photo} size={36} />
+                                <div className="font-body text-sm">
+                                  <span className="font-semibold" style={{ color: "#1B2A4A" }}>{p.name}</span>
+                                  <span className="text-stone-500"> · {p.age} años{p.height ? ` · ${p.height} cm` : ""} · {p.rate} €/evento</span>
+                                  {p.languages && <p className="text-xs text-stone-400">{p.languages}</p>}
+                                </div>
                               </div>
+                              <button
+                                onClick={() => selectApplicant(ev.id, pid)}
+                                className="text-xs font-semibold px-3 py-1.5 rounded-full text-white flex-shrink-0"
+                                style={{ backgroundColor: "#B8860B" }}
+                              >
+                                Seleccionar
+                              </button>
                             </div>
-                            <button
-                              onClick={() => selectApplicant(ev.id, pid)}
-                              className="text-xs font-semibold px-3 py-1.5 rounded-full text-white"
-                              style={{ backgroundColor: "#B8860B" }}
-                            >
-                              Seleccionar
-                            </button>
+                            {p.photos && p.photos.length > 0 && (
+                              <div className="flex gap-1.5 pl-[52px]">
+                                {p.photos.map((photo, i) => (
+                                  <img key={i} src={photo} alt="" className="rounded object-cover" style={{ width: 32, height: 32 }} />
+                                ))}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -976,8 +1014,44 @@ export default function App() {
               </div>
               {photoError && <p className="font-body text-xs mt-2" style={{ color: "#C0392B" }}>{photoError}</p>}
             </div>
+
+            <div>
+              <span className="font-body text-xs font-semibold text-stone-500">Fotos adicionales (hasta 4)</span>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {registerForm.photos.map((photo, i) => (
+                  <div key={i} className="relative">
+                    <img src={photo} alt={`Foto ${i + 1}`} className="rounded-lg object-cover" style={{ width: 56, height: 56, border: "1px solid #E5E0D3" }} />
+                    <button
+                      type="button"
+                      onClick={() => removeGalleryPhoto(i)}
+                      className="absolute -top-1.5 -right-1.5 rounded-full flex items-center justify-center"
+                      style={{ width: 18, height: 18, backgroundColor: "#C0392B" }}
+                    >
+                      <X size={11} color="white" />
+                    </button>
+                  </div>
+                ))}
+                {registerForm.photos.length < 4 && (
+                  <label
+                    className="flex items-center justify-center rounded-lg cursor-pointer"
+                    style={{ width: 56, height: 56, border: "1px dashed #B0A896", color: "#B0A896" }}
+                  >
+                    <Camera size={16} />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleGalleryPhotoChange(e.target.files?.[0])}
+                    />
+                  </label>
+                )}
+              </div>
+            </div>
+
             <Input label="Nombre" value={registerForm.name} onChange={(v) => setRegisterForm({ ...registerForm, name: v })} />
             <Input label="Edad" type="number" value={registerForm.age} onChange={(v) => setRegisterForm({ ...registerForm, age: v })} />
+            <Input label="Altura (cm)" type="number" placeholder="Ej. 172" value={registerForm.height} onChange={(v) => setRegisterForm({ ...registerForm, height: v })} />
+            <Input label="Idiomas" placeholder="Ej. Español, Inglés B2" value={registerForm.languages} onChange={(v) => setRegisterForm({ ...registerForm, languages: v })} />
             <Input label="Ciudad" value={registerForm.city} onChange={(v) => setRegisterForm({ ...registerForm, city: v })} />
             <Input label="Tarifa por evento (€)" type="number" value={registerForm.rate} onChange={(v) => setRegisterForm({ ...registerForm, rate: v })} />
             <Textarea label="Bio breve" value={registerForm.bio} onChange={(v) => setRegisterForm({ ...registerForm, bio: v })} />
