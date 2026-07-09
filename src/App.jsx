@@ -101,6 +101,36 @@ function readAndResizeImage(file, maxSize = 480, quality = 0.75) {
   });
 }
 
+// Mínimo legal SMI 2026 (RD 126/2026) para contratos de duración determinada
+// inferiores a 120 días: 57,82 €/jornada legal (referencia: jornada de 8h).
+// No sustituye la comprobación del convenio sectorial específico (discotecas,
+// que puede fijar un mínimo superior vía "contrato de bolo") — ver aviso en el formulario.
+const SMI_JORNADA_MIN = 57.82;
+const SMI_HORA_MIN = SMI_JORNADA_MIN / 8;
+
+function parseEventHours(timeStr) {
+  if (!timeStr) return null;
+  const parts = timeStr.split("-").map((s) => s.trim());
+  if (parts.length !== 2) return null;
+  const toMinutes = (t) => {
+    const m = t.match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return null;
+    return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+  };
+  const start = toMinutes(parts[0]);
+  const end = toMinutes(parts[1]);
+  if (start === null || end === null) return null;
+  let diff = end - start;
+  if (diff <= 0) diff += 24 * 60; // cruza medianoche
+  return diff / 60;
+}
+
+function legalMinimumForEvent(timeStr) {
+  const hours = parseEventHours(timeStr);
+  if (!hours) return null;
+  return { hours, minimum: Math.round(hours * SMI_HORA_MIN * 100) / 100 };
+}
+
 function Avatar({ name, photo, size = 40 }) {
   const initials = (name || "?").trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
   if (photo) {
@@ -604,6 +634,7 @@ function ContractPreview({ event, profile, onClose }) {
           <p><strong>Artículo 1. Objeto y régimen jurídico.</strong> La Trabajadora prestará a la Empresa el servicio descrito en el Anexo I, bajo la relación laboral especial de artistas en espectáculos públicos regulada por el Real Decreto 1435/1985, de 1 de agosto.</p>
           <p><strong>Artículo 2. Duración.</strong> El presente contrato tiene una duración de un (1) día, coincidente con la fecha del evento. La Trabajadora queda dada de alta en el régimen correspondiente de la Seguridad Social desde el inicio de la jornada y de baja a su finalización.</p>
           <p><strong>Artículo 3. Retribución.</strong> La Trabajadora percibirá la cantidad indicada en el Anexo I en concepto de salario bruto, sobre la que se aplicarán las retenciones de IRPF y cotizaciones a la Seguridad Social legalmente establecidas. La Empresa hará entrega de la nómina correspondiente en el plazo legal.</p>
+          <p className="text-xs text-stone-400">La retribución pactada cumple el salario mínimo interprofesional vigente para contratos de duración determinada inferiores a 120 días (57,82 €/jornada legal, RD 126/2026), sin perjuicio de la tabla salarial específica que, en su caso, establezca el convenio colectivo sectorial aplicable.</p>
           <p><strong>Artículo 4. Cancelaciones.</strong> En caso de cancelación del evento por causas ajenas a la Trabajadora con menos de 48-72 horas de antelación, la Empresa abonará la compensación pactada. En caso de que la Trabajadora no pueda acudir tras confirmar, deberá comunicarlo con la mayor antelación posible.</p>
           <p><strong>Artículo 5. Obligaciones de la Trabajadora.</strong> Prestar el servicio con la diligencia profesional habitual; cumplir el horario y ubicación pactados; respetar el código de conducta e imagen razonablemente exigido para el evento.</p>
           <p><strong>Artículo 6. Obligaciones de la Empresa.</strong> Dar de alta a la Trabajadora en la Seguridad Social antes del inicio de la jornada; facilitar las condiciones adecuadas para la prestación del servicio; abonar la retribución pactada y emitir la nómina en el plazo legal.</p>
@@ -873,10 +904,25 @@ export default function App() {
               <Input label="Ubicación" value={eventForm.location} onChange={(v) => setEventForm({ ...eventForm, location: v })} />
               <Input label="Fecha" type="date" value={eventForm.date} onChange={(v) => setEventForm({ ...eventForm, date: v })} />
               <Input label="Horario" placeholder="23:00 - 05:00" value={eventForm.time} onChange={(v) => setEventForm({ ...eventForm, time: v })} />
-              <Input
-                label={eventForm.type === "vip" ? "Presupuesto (opcional, a negociar)" : "Presupuesto por persona (€)"}
-                type="number" value={eventForm.budget} onChange={(v) => setEventForm({ ...eventForm, budget: v })}
-              />
+              <div>
+                <Input
+                  label={eventForm.type === "vip" ? "Presupuesto (opcional, a negociar)" : "Presupuesto por persona (€)"}
+                  type="number" value={eventForm.budget} onChange={(v) => setEventForm({ ...eventForm, budget: v })}
+                />
+                {(() => {
+                  if (eventForm.type === "vip" || !eventForm.budget || !eventForm.time) return null;
+                  const legal = legalMinimumForEvent(eventForm.time);
+                  if (!legal) return null;
+                  const belowMinimum = Number(eventForm.budget) < legal.minimum;
+                  return (
+                    <p className="font-body text-[11px] mt-1" style={{ color: belowMinimum ? "#C0392B" : "#0F6E6E" }}>
+                      {belowMinimum
+                        ? `⚠ Por debajo del mínimo legal (SMI 2026): ${legal.minimum} € para ${legal.hours.toFixed(1)}h. Revísalo antes de publicar.`
+                        : `✓ Cumple el mínimo legal orientativo (${legal.minimum} € para ${legal.hours.toFixed(1)}h).`}
+                    </p>
+                  );
+                })()}
+              </div>
               <Input label="Plazas" type="number" value={eventForm.spots} onChange={(v) => setEventForm({ ...eventForm, spots: v })} />
               <div className="sm:col-span-2">
                 <Textarea label="Funciones a desempeñar" value={eventForm.functions} onChange={(v) => setEventForm({ ...eventForm, functions: v })} />
