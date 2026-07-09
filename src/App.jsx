@@ -1052,7 +1052,8 @@ export default function App() {
             <Input label="Edad" type="number" value={registerForm.age} onChange={(v) => setRegisterForm({ ...registerForm, age: v })} />
             <Input label="Altura (cm)" type="number" placeholder="Ej. 172" value={registerForm.height} onChange={(v) => setRegisterForm({ ...registerForm, height: v })} />
             <Input label="Idiomas" placeholder="Ej. Español, Inglés B2" value={registerForm.languages} onChange={(v) => setRegisterForm({ ...registerForm, languages: v })} />
-            <Input label="Ciudad" value={registerForm.city} onChange={(v) => setRegisterForm({ ...registerForm, city: v })} />
+            <Select label="Ciudad" value={registerForm.city} onChange={(v) => setRegisterForm({ ...registerForm, city: v })}
+              options={[["Madrid", "Madrid"], ["Barcelona", "Barcelona"], ["Marbella", "Marbella"], ["Valencia", "Valencia"], ["Murcia", "Murcia"]]} />
             <Input label="Tarifa por evento (€)" type="number" value={registerForm.rate} onChange={(v) => setRegisterForm({ ...registerForm, rate: v })} />
             <Textarea label="Bio breve" value={registerForm.bio} onChange={(v) => setRegisterForm({ ...registerForm, bio: v })} />
             <button type="submit" className="w-full font-body text-sm font-semibold px-5 py-2.5 rounded-full text-white mt-2" style={{ backgroundColor: "#0F6E6E" }}>
