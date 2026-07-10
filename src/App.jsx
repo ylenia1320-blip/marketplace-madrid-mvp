@@ -29,18 +29,20 @@ const seedEvents = [
   {
     id: "e1", clientName: "Discoteca Aura", type: "discoteca",
     venue: "Aura Club", date: "2026-07-18", time: "23:00 - 05:00",
-    location: "Calle Velázquez, Madrid", budget: 120, spots: 2,
+    city: "Madrid", location: "Calle Velázquez, Madrid", budget: 120, spots: 2,
     functions: "Recepción de VIPs y animación de pista principal.",
     applicants: ["p1"], selected: null,
   },
   {
     id: "e2", clientName: "Grupo Corporate Events", type: "corporativo",
     venue: "Palacio de Congresos", date: "2026-07-22", time: "09:00 - 14:00",
-    location: "Paseo de la Castellana, Madrid", budget: 180, spots: 3,
+    city: "Madrid", location: "Paseo de la Castellana, Madrid", budget: 180, spots: 3,
     functions: "Acreditación de asistentes y azafatas de sala en congreso fintech.",
     applicants: [], selected: null,
   },
 ];
+
+const CITY_OPTIONS = ["Madrid", "Barcelona", "Marbella", "Valencia", "Murcia"];
 
 const TYPE_LABEL = { discoteca: "Discoteca", corporativo: "Evento corporativo", private: "Private party", vip: "VIP / Privado" };
 const TYPE_COLOR = {
@@ -702,12 +704,21 @@ export default function App() {
   const [events, setEvents] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [myProfileId, setMyProfileId] = useState(null);
+  const [cityFilter, setCityFilter] = useState("Todas");
+
+  React.useEffect(() => {
+    if (myProfileId) {
+      const p = profiles.find((pp) => pp.id === myProfileId);
+      if (p?.city) setCityFilter(p.city);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myProfileId]);
   const [registerForm, setRegisterForm] = useState({ name: "", age: "", city: "Madrid", rate: "", bio: "", photo: null, photos: [], height: "", languages: "" });
   const [photoError, setPhotoError] = useState("");
   const [photoLoading, setPhotoLoading] = useState(false);
   const [eventForm, setEventForm] = useState({
     clientName: "", type: "discoteca", venue: "", date: "", timeStart: "", timeEnd: "",
-    location: "", budget: "", spots: "1", functions: "",
+    city: "Madrid", location: "", budget: "", spots: "1", functions: "",
     confidential: false, billingEntity: "",
   });
   const [contractView, setContractView] = useState(null); // { event, profile }
@@ -827,7 +838,7 @@ export default function App() {
     const combinedTime = eventForm.timeStart && eventForm.timeEnd ? `${eventForm.timeStart} - ${eventForm.timeEnd}` : "";
     const next = [{ id, ...eventForm, time: combinedTime, budget: eventForm.budget ? Number(eventForm.budget) : null, spots: Number(eventForm.spots), applicants: [], selected: null }, ...events];
     setEvents(next);
-    setEventForm({ clientName: "", type: "discoteca", venue: "", date: "", timeStart: "", timeEnd: "", location: "", budget: "", spots: "1", functions: "", confidential: false, billingEntity: "" });
+    setEventForm({ clientName: "", type: "discoteca", venue: "", date: "", timeStart: "", timeEnd: "", city: "Madrid", location: "", budget: "", spots: "1", functions: "", confidential: false, billingEntity: "" });
     persist(undefined, next);
     flash(eventForm.confidential ? "Evento privado publicado — solo visible por invitación." : "Evento publicado y guardado.");
   }
@@ -920,6 +931,8 @@ export default function App() {
                 onChange={(v) => setEventForm({ ...eventForm, type: v, confidential: v === "vip" ? true : eventForm.confidential })}
                 options={[["discoteca", "Discoteca"], ["corporativo", "Evento corporativo"], ["private", "Private party (premium)"], ["vip", "VIP / Privado (a medida)"]]} />
               <Input label="Nombre del evento / venue" value={eventForm.venue} onChange={(v) => setEventForm({ ...eventForm, venue: v })} />
+              <Select label="Ciudad" value={eventForm.city} onChange={(v) => setEventForm({ ...eventForm, city: v })}
+                options={CITY_OPTIONS.map((c) => [c, c])} />
               <Input label="Ubicación" value={eventForm.location} onChange={(v) => setEventForm({ ...eventForm, location: v })} />
               <Input label="Fecha" type="date" value={eventForm.date} onChange={(v) => setEventForm({ ...eventForm, date: v })} />
               <Select label="Hora de entrada" value={eventForm.timeStart} onChange={(v) => setEventForm({ ...eventForm, timeStart: v })}
@@ -1121,7 +1134,7 @@ export default function App() {
             <Input label="Altura (cm)" type="number" placeholder="Ej. 172" value={registerForm.height} onChange={(v) => setRegisterForm({ ...registerForm, height: v })} />
             <Input label="Idiomas" placeholder="Ej. Español, Inglés B2" value={registerForm.languages} onChange={(v) => setRegisterForm({ ...registerForm, languages: v })} />
             <Select label="Ciudad" value={registerForm.city} onChange={(v) => setRegisterForm({ ...registerForm, city: v })}
-              options={[["Madrid", "Madrid"], ["Barcelona", "Barcelona"], ["Marbella", "Marbella"], ["Valencia", "Valencia"], ["Murcia", "Murcia"]]} />
+              options={CITY_OPTIONS.map((c) => [c, c])} />
             <Input label="Tarifa por evento (€)" type="number" value={registerForm.rate} onChange={(v) => setRegisterForm({ ...registerForm, rate: v })} />
             <Textarea label="Bio breve" value={registerForm.bio} onChange={(v) => setRegisterForm({ ...registerForm, bio: v })} />
             <button type="submit" className="w-full font-body text-sm font-semibold px-5 py-2.5 rounded-full text-white mt-2" style={{ backgroundColor: "#0F6E6E" }}>
@@ -1135,7 +1148,9 @@ export default function App() {
   }
 
   const myEvents = events.filter(e => e.selected === myProfile.id);
-  const openEvents = events.filter(e => e.selected !== myProfile.id);
+  const effectiveCityFilter = cityFilter === "Todas" ? null : cityFilter;
+  const openEventsAll = events.filter(e => e.selected !== myProfile.id);
+  const openEvents = effectiveCityFilter ? openEventsAll.filter((e) => e.city === effectiveCityFilter) : openEventsAll;
 
   return (
     <div className="min-h-screen font-body" style={{ backgroundColor: "#FBF9F4" }}>
@@ -1168,8 +1183,25 @@ export default function App() {
         )}
 
         <section>
-          <h2 className="font-display text-xl mb-4" style={{ color: "#1B2A4A" }}>Eventos disponibles</h2>
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h2 className="font-display text-xl" style={{ color: "#1B2A4A" }}>Eventos disponibles</h2>
+            <div className="flex items-center gap-2">
+              <MapPin size={14} className="text-stone-400" />
+              <select
+                value={cityFilter}
+                onChange={(e) => setCityFilter(e.target.value)}
+                className="font-body text-xs font-semibold px-3 py-1.5 rounded-full bg-white"
+                style={{ border: "1px solid #E5E0D3", color: "#1B2A4A" }}
+              >
+                <option value="Todas">Todas las ciudades</option>
+                {CITY_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
           <div className="space-y-5">
+            {openEvents.length === 0 && (
+              <p className="font-body text-sm text-stone-400">No hay eventos disponibles en {effectiveCityFilter || "esta selección"} ahora mismo.</p>
+            )}
             {openEvents.map((ev) => {
               const applied = ev.applicants.includes(myProfile.id);
               return (
