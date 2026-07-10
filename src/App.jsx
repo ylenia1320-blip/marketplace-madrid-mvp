@@ -715,20 +715,23 @@ export default function App() {
   const [photoLoading, setPhotoLoading] = useState(false);
   const [eventForm, setEventForm] = useState({
     clientName: "", type: "discoteca", venue: "", date: "", timeStart: "", timeEnd: "",
-    city: "Madrid", location: "", budget: "", spots: "1", functions: "",
+    city: "Madrid", location: "", budget: "", clientPrice: "", spots: "1", functions: "",
     confidential: false, billingEntity: "",
   });
   const [contractView, setContractView] = useState(null); // { event, profile }
   const [toast, setToast] = useState("");
   const [saving, setSaving] = useState(false);
+  const [clientSubs, setClientSubs] = useState({}); // { [clientName]: { subscribed: bool, fee: number } }
 
   // Load data on mount (falls back to seed data if nothing stored yet)
   React.useEffect(() => {
     try {
       const p = localStorage.getItem("marketplace_profiles");
       const e = localStorage.getItem("marketplace_events");
+      const c = localStorage.getItem("marketplace_clientSubs");
       setProfiles(p ? JSON.parse(p) : seedProfiles);
       setEvents(e ? JSON.parse(e) : seedEvents);
+      setClientSubs(c ? JSON.parse(c) : {});
     } catch (err) {
       console.error("Storage load error:", err);
       setProfiles(seedProfiles);
@@ -738,11 +741,12 @@ export default function App() {
     }
   }, []);
 
-  function persist(nextProfiles, nextEvents) {
+  function persist(nextProfiles, nextEvents, nextClientSubs) {
     setSaving(true);
     try {
       if (nextProfiles !== undefined) localStorage.setItem("marketplace_profiles", JSON.stringify(nextProfiles));
       if (nextEvents !== undefined) localStorage.setItem("marketplace_events", JSON.stringify(nextEvents));
+      if (nextClientSubs !== undefined) localStorage.setItem("marketplace_clientSubs", JSON.stringify(nextClientSubs));
     } catch (err) {
       console.error("Storage save error:", err);
     } finally {
@@ -833,9 +837,14 @@ export default function App() {
     if (!eventForm.clientName || !eventForm.venue || !eventForm.date) return;
     const id = "e" + Date.now();
     const combinedTime = eventForm.timeStart && eventForm.timeEnd ? `${eventForm.timeStart} - ${eventForm.timeEnd}` : "";
-    const next = [{ id, ...eventForm, time: combinedTime, budget: eventForm.budget ? Number(eventForm.budget) : null, spots: Number(eventForm.spots), applicants: [], selected: null }, ...events];
+    const next = [{
+      id, ...eventForm, time: combinedTime,
+      budget: eventForm.budget ? Number(eventForm.budget) : null,
+      clientPrice: eventForm.clientPrice ? Number(eventForm.clientPrice) : (eventForm.budget ? Number(eventForm.budget) : null),
+      spots: Number(eventForm.spots), applicants: [], selected: null,
+    }, ...events];
     setEvents(next);
-    setEventForm({ clientName: "", type: "discoteca", venue: "", date: "", timeStart: "", timeEnd: "", city: "Madrid", location: "", budget: "", spots: "1", functions: "", confidential: false, billingEntity: "" });
+    setEventForm({ clientName: "", type: "discoteca", venue: "", date: "", timeStart: "", timeEnd: "", city: "Madrid", location: "", budget: "", clientPrice: "", spots: "1", functions: "", confidential: false, billingEntity: "" });
     persist(undefined, next);
     flash(eventForm.confidential ? "Evento privado publicado — solo visible por invitación." : "Evento publicado y guardado.");
   }
@@ -906,6 +915,171 @@ export default function App() {
               </div>
             </button>
           </div>
+
+          <div className="text-center mt-10">
+            <button
+              onClick={() => setRole("admin")}
+              className="font-body text-xs text-stone-400 hover:text-stone-600 underline"
+            >
+              Acceso administrador
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ---------------- ADMIN VIEW ----------------
+  if (role === "admin") {
+    function toggleClientSub(clientName) {
+      const current = clientSubs[clientName] || { subscribed: false, fee: 0 };
+      const next = { ...clientSubs, [clientName]: { ...current, subscribed: !current.subscribed } };
+      setClientSubs(next);
+      persist(undefined, undefined, next);
+    }
+    function updateSubFee(clientName, fee) {
+      const current = clientSubs[clientName] || { subscribed: false, fee: 0 };
+      const next = { ...clientSubs, [clientName]: { ...current, fee: Number(fee) || 0 } };
+      setClientSubs(next);
+      persist(undefined, undefined, next);
+    }
+
+    const matchedEvents = events.filter((ev) => ev.selected);
+    const years = [...new Set(matchedEvents.map((ev) => (ev.date || "").slice(0, 4)).filter(Boolean))].sort().reverse();
+    const currentYear = String(new Date().getFullYear());
+    const yearOptions = years.length ? years : [currentYear];
+
+    // Agregado por local (venue) — todas las fechas
+    const byVenue = {};
+    matchedEvents.forEach((ev) => {
+      const key = ev.venue || ev.clientName || "Sin nombre";
+      if (!byVenue[key]) byVenue[key] = { clientName: ev.clientName, revenue: 0, cost: 0, count: 0 };
+      const clientPrice = ev.clientPrice ?? ev.budget ?? 0;
+      const cost = ev.budget ?? 0;
+      byVenue[key].revenue += clientPrice * (ev.spots || 1);
+      byVenue[key].cost += cost * (ev.spots || 1);
+      byVenue[key].count += 1;
+    });
+    const venueRows = Object.entries(byVenue).sort((a, b) => (b[1].revenue - b[1].cost) - (a[1].revenue - a[1].cost));
+
+    const totalRevenue = matchedEvents.reduce((s, ev) => s + (ev.clientPrice ?? ev.budget ?? 0) * (ev.spots || 1), 0);
+    const totalCost = matchedEvents.reduce((s, ev) => s + (ev.budget ?? 0) * (ev.spots || 1), 0);
+    const totalMargin = totalRevenue - totalCost;
+    const subscribedCount = Object.values(clientSubs).filter((c) => c.subscribed).length;
+    const subsRevenue = Object.values(clientSubs).filter((c) => c.subscribed).reduce((s, c) => s + (c.fee || 0), 0);
+
+    return (
+      <div className="min-h-screen font-body" style={{ backgroundColor: "#FBF9F4" }}>
+        {FONTS}
+        <div className="border-b bg-white" style={{ borderColor: "#E5E0D3" }}>
+          <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
+            <button onClick={() => setRole(null)} className="flex items-center gap-1.5 font-body text-sm text-stone-500 hover:text-stone-700">
+              <ChevronLeft size={16} /> Salir
+            </button>
+            <span className="font-body text-sm font-semibold" style={{ color: "#1B2A4A" }}>Panel Administrador</span>
+          </div>
+        </div>
+
+        <div className="max-w-4xl mx-auto px-6 py-8 space-y-8">
+          <div className="grid sm:grid-cols-4 gap-4">
+            <div className="bg-white rounded-2xl p-5 border" style={{ borderColor: "#E5E0D3" }}>
+              <p className="font-body text-xs text-stone-400 uppercase tracking-wide">Ingresos totales</p>
+              <p className="font-display text-2xl mt-1" style={{ color: "#1B2A4A" }}>{totalRevenue.toFixed(0)} €</p>
+            </div>
+            <div className="bg-white rounded-2xl p-5 border" style={{ borderColor: "#E5E0D3" }}>
+              <p className="font-body text-xs text-stone-400 uppercase tracking-wide">Pagado a Profesionales</p>
+              <p className="font-display text-2xl mt-1" style={{ color: "#1B2A4A" }}>{totalCost.toFixed(0)} €</p>
+            </div>
+            <div className="bg-white rounded-2xl p-5 border" style={{ borderColor: "#B8860B" }}>
+              <p className="font-body text-xs uppercase tracking-wide" style={{ color: "#B8860B" }}>Tu margen (eventos)</p>
+              <p className="font-display text-2xl mt-1" style={{ color: "#1B2A4A" }}>{totalMargin.toFixed(0)} €</p>
+            </div>
+            <div className="bg-white rounded-2xl p-5 border" style={{ borderColor: "#0F6E6E" }}>
+              <p className="font-body text-xs uppercase tracking-wide" style={{ color: "#0F6E6E" }}>Ingresos por suscripción</p>
+              <p className="font-display text-2xl mt-1" style={{ color: "#1B2A4A" }}>{subsRevenue.toFixed(0)} €/mes</p>
+              <p className="font-body text-[11px] text-stone-400">{subscribedCount} local(es) suscrito(s)</p>
+            </div>
+          </div>
+
+          <section>
+            <h2 className="font-display text-xl mb-4" style={{ color: "#1B2A4A" }}>Ganancias por local</h2>
+            {venueRows.length === 0 ? (
+              <p className="font-body text-sm text-stone-400">Todavía no hay eventos con match confirmado.</p>
+            ) : (
+              <div className="bg-white rounded-2xl border overflow-hidden" style={{ borderColor: "#E5E0D3" }}>
+                <table className="w-full font-body text-sm">
+                  <thead>
+                    <tr style={{ backgroundColor: "#F2EFE6" }}>
+                      <th className="text-left px-4 py-3 font-semibold" style={{ color: "#1B2A4A" }}>Local</th>
+                      <th className="text-right px-4 py-3 font-semibold" style={{ color: "#1B2A4A" }}>Eventos</th>
+                      <th className="text-right px-4 py-3 font-semibold" style={{ color: "#1B2A4A" }}>Ingresos</th>
+                      <th className="text-right px-4 py-3 font-semibold" style={{ color: "#1B2A4A" }}>Margen</th>
+                      <th className="text-center px-4 py-3 font-semibold" style={{ color: "#1B2A4A" }}>Suscrito</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {venueRows.map(([venue, data]) => {
+                      const sub = clientSubs[venue] || { subscribed: false, fee: 0 };
+                      return (
+                        <tr key={venue} className="border-t" style={{ borderColor: "#E5E0D3" }}>
+                          <td className="px-4 py-3">
+                            <span className="font-semibold" style={{ color: "#1B2A4A" }}>{venue}</span>
+                            <span className="text-stone-400"> · {data.clientName}</span>
+                          </td>
+                          <td className="px-4 py-3 text-right text-stone-500">{data.count}</td>
+                          <td className="px-4 py-3 text-right">{data.revenue.toFixed(0)} €</td>
+                          <td className="px-4 py-3 text-right font-semibold" style={{ color: "#0F6E6E" }}>{(data.revenue - data.cost).toFixed(0)} €</td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                onClick={() => toggleClientSub(venue)}
+                                className="text-xs font-semibold px-3 py-1 rounded-full text-white"
+                                style={{ backgroundColor: sub.subscribed ? "#0F6E6E" : "#B0A896" }}
+                              >
+                                {sub.subscribed ? "Sí" : "No"}
+                              </button>
+                              {sub.subscribed && (
+                                <input
+                                  type="number"
+                                  value={sub.fee || ""}
+                                  onChange={(e) => updateSubFee(venue, e.target.value)}
+                                  placeholder="€/mes"
+                                  className="w-16 text-xs rounded border px-1 py-1"
+                                  style={{ borderColor: "#E5E0D3" }}
+                                />
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <p className="font-body text-[11px] text-stone-400 mt-2">
+              El margen se calcula como Precio al Cliente − Pago a la Profesional. Si un evento no tiene "Precio al Cliente" indicado, se asume igual al pago (margen 0) — revisa esos eventos si quieres reflejar bien tu beneficio real.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="font-display text-xl mb-4" style={{ color: "#1B2A4A" }}>Resumen anual</h2>
+            <div className="space-y-2">
+              {yearOptions.map((yr) => {
+                const yrEvents = matchedEvents.filter((ev) => (ev.date || "").startsWith(yr));
+                const yrRevenue = yrEvents.reduce((s, ev) => s + (ev.clientPrice ?? ev.budget ?? 0) * (ev.spots || 1), 0);
+                const yrCost = yrEvents.reduce((s, ev) => s + (ev.budget ?? 0) * (ev.spots || 1), 0);
+                return (
+                  <div key={yr} className="bg-white rounded-xl p-4 border flex items-center justify-between" style={{ borderColor: "#E5E0D3" }}>
+                    <span className="font-body font-semibold" style={{ color: "#1B2A4A" }}>{yr}</span>
+                    <span className="font-body text-sm text-stone-500">{yrEvents.length} eventos</span>
+                    <span className="font-body text-sm">{yrRevenue.toFixed(0)} € ingresos</span>
+                    <span className="font-body text-sm font-semibold" style={{ color: "#0F6E6E" }}>{(yrRevenue - yrCost).toFixed(0)} € margen</span>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
         </div>
       </div>
     );
@@ -938,7 +1112,7 @@ export default function App() {
                 options={[["", "Selecciona"], ...TIME_OPTIONS.map((t) => [t, t])]} />
               <div>
                 <Input
-                  label={eventForm.type === "vip" ? "Presupuesto (opcional, a negociar)" : "Presupuesto por persona (€)"}
+                  label={eventForm.type === "vip" ? "Pago a la Profesional (opcional, a negociar)" : "Pago a la Profesional (€)"}
                   type="number" value={eventForm.budget} onChange={(v) => setEventForm({ ...eventForm, budget: v })}
                 />
                 {(() => {
@@ -954,6 +1128,18 @@ export default function App() {
                     </p>
                   );
                 })()}
+              </div>
+              <div>
+                <Input
+                  label="Precio al Cliente (€, opcional)"
+                  type="number" value={eventForm.clientPrice} onChange={(v) => setEventForm({ ...eventForm, clientPrice: v })}
+                  placeholder={eventForm.budget ? `Ej. ${Math.round(Number(eventForm.budget) * 1.5)}` : "Igual al pago si se deja vacío"}
+                />
+                {eventForm.budget && eventForm.clientPrice && Number(eventForm.clientPrice) > Number(eventForm.budget) && (
+                  <p className="font-body text-[11px] mt-1" style={{ color: "#0F6E6E" }}>
+                    Tu margen: {(Number(eventForm.clientPrice) - Number(eventForm.budget)).toFixed(0)} € por profesional
+                  </p>
+                )}
               </div>
               <Input label="Plazas" type="number" value={eventForm.spots} onChange={(v) => setEventForm({ ...eventForm, spots: v })} />
               <div className="sm:col-span-2">
