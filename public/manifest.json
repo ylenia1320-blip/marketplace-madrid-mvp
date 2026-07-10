@@ -1,7 +1,7 @@
 {
-  "name": "Marketplace Madrid — Imagen y Eventos",
-  "short_name": "Marketplace MVP",
-  "description": "Match entre profesionales de imagen/azafatas y discotecas, eventos corporativos y private parties en Madrid.",
+  "name": "Selecta — Talento para Eventos",
+  "short_name": "Selecta",
+  "description": "Match entre profesionales de imagen/azafatas y discotecas, eventos corporativos y private parties.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FBF9F4",
