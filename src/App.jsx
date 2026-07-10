@@ -1,14 +1,14 @@
 import React, { useState } from "react";
 import {
   Sparkles, MapPin, Calendar, Clock, Euro, Users, ArrowRight, Check,
-  FileText, X, ChevronLeft, Star, Building2, UserRound, Ticket, Send, Lock, Camera
+  FileText, X, ChevronLeft, Star, Building2, UserRound, Send, Lock, Camera
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Design tokens (carried from the project's legal document branding)
-// Navy  #1B2A4A  — authority, contracts, structure
-// Gold  #B8860B  — premium / private-parties tier
-// Teal  #0F6E6E  — active state, confirmed match
+// Navy  #1C1B19  — authority, contracts, structure
+// Gold  #9C7A3C  — premium / private-parties tier
+// Teal  #1C1B19  — active state, confirmed match
 // Cream #FBF9F4  — page ground
 // ---------------------------------------------------------------------------
 
@@ -44,30 +44,30 @@ const seedEvents = [
 
 const CITY_OPTIONS = ["Madrid", "Barcelona", "Marbella", "Valencia", "Murcia"];
 
+// CAMBIA ESTE PIN por uno tuyo antes de usar la app de verdad.
+// Protección básica (no es seguridad real: alguien que mire el código fuente podría verlo),
+// pero evita que cualquier visitante curioso entre en el Panel Administrador sin más.
+const ADMIN_PIN = "2604";
+
 const TYPE_LABEL = { discoteca: "Discoteca", corporativo: "Evento corporativo", private: "Private party", vip: "VIP / Privado" };
+// Minimalismo: casi todo en tinta; el dorado apagado se reserva solo para las categorías premium.
 const TYPE_COLOR = {
-  discoteca: { bg: "#DCEFEF", text: "#0F6E6E", border: "#0F6E6E" },
-  corporativo: { bg: "#E9EDF4", text: "#1B2A4A", border: "#1B2A4A" },
-  private: { bg: "#F5E6C8", text: "#8A6205", border: "#B8860B" },
-  vip: { bg: "#1B2A4A", text: "#FFFFFF", border: "#1B2A4A" },
+  discoteca: { text: "#1C1B19", border: "#D8D3C7" },
+  corporativo: { text: "#1C1B19", border: "#D8D3C7" },
+  private: { text: "#9C7A3C", border: "#9C7A3C" },
+  vip: { text: "#9C7A3C", border: "#9C7A3C" },
 };
 
 function TicketDivider() {
-  return (
-    <div className="relative h-4 flex items-center">
-      <div className="absolute left-[-14px] w-7 h-7 rounded-full bg-[#FBF9F4]" />
-      <div className="absolute right-[-14px] w-7 h-7 rounded-full bg-[#FBF9F4]" />
-      <div className="w-full border-t border-dashed" style={{ borderColor: "#C9C2AE" }} />
-    </div>
-  );
+  return <div className="border-t" style={{ borderColor: "#E5E0D3" }} />;
 }
 
 function Badge({ children, type }) {
   const c = TYPE_COLOR[type];
   return (
     <span
-      className="font-body text-[11px] font-semibold tracking-wide uppercase px-2.5 py-1 rounded-full"
-      style={{ backgroundColor: c.bg, color: c.text }}
+      className="font-body text-[10px] font-semibold tracking-[0.12em] uppercase px-2.5 py-1 rounded-full border"
+      style={{ color: c.text, borderColor: c.border }}
     >
       {children}
     </span>
@@ -154,7 +154,7 @@ function Avatar({ name, photo, size = 40 }) {
   return (
     <div
       className="rounded-full flex items-center justify-center flex-shrink-0 font-body font-semibold"
-      style={{ width: size, height: size, backgroundColor: "#1B2A4A", color: "#F5E6C8", fontSize: size * 0.38 }}
+      style={{ width: size, height: size, backgroundColor: "#1C1B19", color: "#F1EDE4", fontSize: size * 0.38 }}
     >
       {initials}
     </div>
@@ -165,19 +165,19 @@ function EventTicket({ event, profiles, children, revealed = true }) {
   const c = TYPE_COLOR[event.type];
   const isMasked = event.confidential && !revealed;
   return (
-    <div className="rounded-2xl overflow-hidden shadow-sm border" style={{ borderColor: "#E5E0D3" }}>
+    <div className="rounded-lg border" style={{ borderColor: "#E5E0D3" }}>
       <div className="p-5" style={{ backgroundColor: "#FFFFFF" }}>
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
               <Badge type={event.type}>{TYPE_LABEL[event.type]}</Badge>
               {event.confidential && (
-                <span className="flex items-center gap-1 font-body text-[10px] font-semibold uppercase tracking-wide" style={{ color: "#B8860B" }}>
+                <span className="flex items-center gap-1 font-body text-[10px] font-semibold uppercase tracking-wide" style={{ color: "#9C7A3C" }}>
                   <Lock size={11} /> Confidencial
                 </span>
               )}
             </div>
-            <h3 className="font-display text-xl mt-2" style={{ color: "#1B2A4A" }}>
+            <h3 className="font-display text-xl mt-2" style={{ color: "#1C1B19" }}>
               {isMasked ? "Evento privado" : event.venue}
             </h3>
             <p className="font-body text-sm text-stone-500">
@@ -185,7 +185,7 @@ function EventTicket({ event, profiles, children, revealed = true }) {
             </p>
           </div>
           <div className="text-right font-body">
-            <div className="flex items-center gap-1 justify-end text-sm font-semibold" style={{ color: c.text === "#FFFFFF" ? "#1B2A4A" : c.text }}>
+            <div className="flex items-center gap-1 justify-end text-sm font-semibold" style={{ color: "#1C1B19" }}>
               {isMasked || !event.budget ? (
                 <span className="text-stone-400 italic text-xs">A negociar</span>
               ) : (
@@ -209,9 +209,9 @@ function EventTicket({ event, profiles, children, revealed = true }) {
         </p>
       </div>
 
-      <div className="px-5"><TicketDivider /></div>
+      <TicketDivider />
 
-      <div className="p-5 pt-4" style={{ backgroundColor: "#FCFAF6" }}>{children}</div>
+      <div className="p-5 pt-4" style={{ backgroundColor: "#FFFFFF" }}>{children}</div>
     </div>
   );
 }
@@ -231,17 +231,17 @@ function StepFlow({ active }) {
             <div
               className="w-9 h-9 rounded-full flex items-center justify-center border-2"
               style={{
-                borderColor: active >= s.n ? "#B8860B" : "#DAD3C0",
-                backgroundColor: active >= s.n ? "#B8860B" : "transparent",
+                borderColor: active >= s.n ? "#9C7A3C" : "#DAD3C0",
+                backgroundColor: active >= s.n ? "#9C7A3C" : "transparent",
                 color: active >= s.n ? "#fff" : "#B0A88E",
               }}
             >
               <s.icon size={16} />
             </div>
-            <span className="text-[11px] leading-tight" style={{ color: active >= s.n ? "#1B2A4A" : "#B0A88E" }}>{s.label}</span>
+            <span className="text-[11px] leading-tight" style={{ color: active >= s.n ? "#1C1B19" : "#B0A88E" }}>{s.label}</span>
           </div>
           {i < steps.length - 1 && (
-            <div className="flex-1 h-[2px] mb-5" style={{ backgroundColor: active > s.n ? "#B8860B" : "#E5E0D3" }} />
+            <div className="flex-1 h-[2px] mb-5" style={{ backgroundColor: active > s.n ? "#9C7A3C" : "#E5E0D3" }} />
           )}
         </React.Fragment>
       ))}
@@ -623,13 +623,13 @@ function ContractPreview({ event, profile, onClose }) {
       <div className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-2xl">
         <div className="p-5 flex items-center justify-between border-b" style={{ borderColor: "#E5E0D3" }}>
           <div className="flex items-center gap-2">
-            <FileText size={18} style={{ color: "#B8860B" }} />
-            <h3 className="font-display text-lg" style={{ color: "#1B2A4A" }}>Anexo I + Contrato de trabajo generado</h3>
+            <FileText size={18} style={{ color: "#9C7A3C" }} />
+            <h3 className="font-display text-lg" style={{ color: "#1C1B19" }}>Anexo I + Contrato de trabajo generado</h3>
           </div>
           <button onClick={onClose} className="text-stone-400 hover:text-stone-600"><X size={20} /></button>
         </div>
         <div className="p-6 font-body text-sm text-stone-700 leading-relaxed space-y-4">
-          <p className="text-xs uppercase tracking-wide font-semibold" style={{ color: "#B8860B" }}>Anexo I — Datos del evento</p>
+          <p className="text-xs uppercase tracking-wide font-semibold" style={{ color: "#9C7A3C" }}>Anexo I — Datos del evento</p>
           <div className="rounded-lg p-4 space-y-1.5" style={{ backgroundColor: "#FBF9F4" }}>
             <p><strong>Cliente final:</strong> {event.billingEntity || event.clientName}</p>
             <p><strong>Ubicación:</strong> {event.venue}, {event.location}</p>
@@ -638,13 +638,13 @@ function ContractPreview({ event, profile, onClose }) {
             <p><strong>Salario bruto pactado:</strong> {event.budget} € (antes de retenciones)</p>
           </div>
 
-          <p className="text-xs uppercase tracking-wide font-semibold pt-2" style={{ color: "#B8860B" }}>Contrato de trabajo temporal — Circunstancias de la producción (art. 15.2 ET)</p>
+          <p className="text-xs uppercase tracking-wide font-semibold pt-2" style={{ color: "#9C7A3C" }}>Contrato de trabajo temporal — Circunstancias de la producción (art. 15.2 ET)</p>
           <p>En Madrid, a {today}.</p>
-          <p className="font-semibold" style={{ color: "#1B2A4A" }}>REUNIDOS</p>
+          <p className="font-semibold" style={{ color: "#1C1B19" }}>REUNIDOS</p>
           <p>De una parte, <strong>[NOMBRE COMERCIAL / RAZÓN SOCIAL DE LA EMPRESA]</strong>, con NIF/CIF [NIF/CIF], en su condición de empleadora, en adelante "la Empresa".</p>
           <p>De otra parte, <strong>{profile.name}</strong>, mayor de edad, con NIF [NIF] y número de afiliación a la Seguridad Social [NAF], en adelante "la Trabajadora".</p>
           <p>Ambas partes se reconocen mutua capacidad legal para contratar y, a tal efecto,</p>
-          <p className="font-semibold" style={{ color: "#1B2A4A" }}>EXPONEN</p>
+          <p className="font-semibold" style={{ color: "#1C1B19" }}>EXPONEN</p>
           <p>Que la Empresa ha sido contratada por <strong>{event.billingEntity || event.clientName}</strong> para prestar el servicio descrito en el Anexo I, y que necesita para ello los servicios profesionales de la Trabajadora para el evento correspondiente.</p>
           <p>Y en su virtud, ACUERDAN suscribir el presente contrato de trabajo temporal por circunstancias de la producción, con arreglo a las siguientes:</p>
 
@@ -665,7 +665,7 @@ function ContractPreview({ event, profile, onClose }) {
             <button
               onClick={onClose}
               className="font-body text-sm font-semibold px-5 py-2.5 rounded-full"
-              style={{ color: "#1B2A4A", border: "1px solid #E5E0D3" }}
+              style={{ color: "#1C1B19", border: "1px solid #E5E0D3" }}
             >
               Cerrar
             </button>
@@ -674,7 +674,7 @@ function ContractPreview({ event, profile, onClose }) {
                 onClick={handleDownloadNda}
                 disabled={downloadingNda}
                 className="flex items-center gap-2 font-body text-sm font-semibold px-5 py-2.5 rounded-full disabled:opacity-60"
-                style={{ color: "#1B2A4A", border: "1px solid #1B2A4A" }}
+                style={{ color: "#1C1B19", border: "1px solid #1C1B19" }}
               >
                 <Lock size={14} /> {downloadingNda ? "Generando…" : "Descargar Confidencialidad"}
               </button>
@@ -683,7 +683,7 @@ function ContractPreview({ event, profile, onClose }) {
               onClick={handleDownload}
               disabled={downloading}
               className="flex items-center gap-2 font-body text-sm font-semibold px-5 py-2.5 rounded-full text-white disabled:opacity-60"
-              style={{ backgroundColor: "#B8860B" }}
+              style={{ backgroundColor: "#9C7A3C" }}
             >
               <FileText size={14} /> {downloading ? "Generando PDF…" : "Descargar contrato oficial"}
             </button>
@@ -722,6 +722,9 @@ export default function App() {
   const [toast, setToast] = useState("");
   const [saving, setSaving] = useState(false);
   const [clientSubs, setClientSubs] = useState({}); // { [clientName]: { subscribed: bool, fee: number } }
+  const [adminUnlocked, setAdminUnlocked] = useState(false);
+  const [adminPinInput, setAdminPinInput] = useState("");
+  const [adminPinError, setAdminPinError] = useState("");
 
   // Load data on mount (falls back to seed data if nothing stored yet)
   React.useEffect(() => {
@@ -765,8 +768,8 @@ export default function App() {
     return (
       <div className="min-h-screen flex items-center justify-center font-body" style={{ backgroundColor: "#FBF9F4" }}>
         {FONTS}
-        <div className="flex items-center gap-2 text-sm" style={{ color: "#1B2A4A" }}>
-          <Sparkles size={16} style={{ color: "#B8860B" }} className="animate-pulse" /> Cargando datos guardados…
+        <div className="flex items-center gap-2 text-sm" style={{ color: "#1C1B19" }}>
+          <Sparkles size={16} style={{ color: "#9C7A3C" }} className="animate-pulse" /> Cargando datos guardados…
         </div>
       </div>
     );
@@ -871,14 +874,14 @@ export default function App() {
       <div className="min-h-screen font-body" style={{ backgroundColor: "#FBF9F4" }}>
         {FONTS}
         <div className="max-w-3xl mx-auto px-6 pt-20 pb-16">
-          <div className="flex items-center gap-2 mb-8 justify-center">
-            <Ticket size={18} style={{ color: "#B8860B" }} />
-            <span className="font-body text-xs tracking-[0.2em] uppercase font-semibold" style={{ color: "#B8860B" }}>
-              Prototipo MVP — Madrid
+          <div className="flex flex-col items-center mb-8">
+            <span className="font-display text-lg tracking-[0.2em] uppercase" style={{ color: "#1C1B19" }}>
+              Selecta
             </span>
+            <div className="w-8 h-px mt-3" style={{ backgroundColor: "#9C7A3C" }} />
           </div>
-          <h1 className="font-display text-center text-4xl md:text-5xl leading-tight" style={{ color: "#1B2A4A" }}>
-            El intermediario que faltaba<br />entre <em>imagen</em> y <em>evento</em>.
+          <h1 className="font-display text-center text-4xl md:text-5xl leading-tight" style={{ color: "#1C1B19" }}>
+            El talento seleccionado<br />para cada <em>evento</em>.
           </h1>
           <p className="font-body text-center text-stone-500 mt-5 max-w-lg mx-auto">
             Match en tiempo real entre discotecas, eventos corporativos y profesionales de imagen, con contrato generado automáticamente al cerrar el trato.
@@ -891,26 +894,26 @@ export default function App() {
           <div className="grid sm:grid-cols-2 gap-5 mt-10">
             <button
               onClick={() => setRole("cliente")}
-              className="group text-left p-6 rounded-2xl border-2 bg-white transition hover:shadow-md"
+              className="group text-left p-6 rounded-lg border bg-white transition hover:border-[#1C1B19]"
               style={{ borderColor: "#E5E0D3" }}
             >
-              <Building2 size={22} style={{ color: "#1B2A4A" }} />
-              <h3 className="font-display text-xl mt-3" style={{ color: "#1B2A4A" }}>Soy Cliente</h3>
+              <Building2 size={20} style={{ color: "#1C1B19" }} />
+              <h3 className="font-display text-xl mt-3" style={{ color: "#1C1B19" }}>Soy Cliente</h3>
               <p className="font-body text-sm text-stone-500 mt-1">Discoteca, empresa de eventos o particular. Publica un evento y selecciona candidatas.</p>
-              <div className="mt-4 flex items-center gap-1 text-sm font-semibold" style={{ color: "#B8860B" }}>
+              <div className="mt-4 flex items-center gap-1 text-sm font-semibold" style={{ color: "#1C1B19" }}>
                 Entrar <ArrowRight size={14} className="group-hover:translate-x-0.5 transition" />
               </div>
             </button>
 
             <button
               onClick={() => setRole("profesional")}
-              className="group text-left p-6 rounded-2xl border-2 bg-white transition hover:shadow-md"
+              className="group text-left p-6 rounded-lg border bg-white transition hover:border-[#1C1B19]"
               style={{ borderColor: "#E5E0D3" }}
             >
-              <UserRound size={22} style={{ color: "#0F6E6E" }} />
-              <h3 className="font-display text-xl mt-3" style={{ color: "#1B2A4A" }}>Soy Profesional</h3>
+              <UserRound size={20} style={{ color: "#1C1B19" }} />
+              <h3 className="font-display text-xl mt-3" style={{ color: "#1C1B19" }}>Soy Profesional</h3>
               <p className="font-body text-sm text-stone-500 mt-1">Modelo de imagen o azafata. Regístrate y aplica a eventos disponibles.</p>
-              <div className="mt-4 flex items-center gap-1 text-sm font-semibold" style={{ color: "#0F6E6E" }}>
+              <div className="mt-4 flex items-center gap-1 text-sm font-semibold" style={{ color: "#1C1B19" }}>
                 Entrar <ArrowRight size={14} className="group-hover:translate-x-0.5 transition" />
               </div>
             </button>
@@ -931,6 +934,51 @@ export default function App() {
 
   // ---------------- ADMIN VIEW ----------------
   if (role === "admin") {
+    if (!adminUnlocked) {
+      return (
+        <div className="min-h-screen font-body flex items-center justify-center" style={{ backgroundColor: "#FBF9F4" }}>
+          {FONTS}
+          <div className="bg-white rounded-2xl p-8 border max-w-sm w-full mx-6" style={{ borderColor: "#E5E0D3" }}>
+            <div className="flex items-center gap-2 mb-1">
+              <Lock size={16} style={{ color: "#9C7A3C" }} />
+              <h2 className="font-display text-xl" style={{ color: "#1C1B19" }}>Panel Administrador</h2>
+            </div>
+            <p className="font-body text-sm text-stone-500 mb-4">Introduce el PIN para continuar.</p>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (adminPinInput === ADMIN_PIN) {
+                  setAdminUnlocked(true);
+                  setAdminPinError("");
+                } else {
+                  setAdminPinError("PIN incorrecto.");
+                }
+              }}
+              className="space-y-3"
+            >
+              <input
+                type="password"
+                inputMode="numeric"
+                autoFocus
+                value={adminPinInput}
+                onChange={(e) => setAdminPinInput(e.target.value)}
+                className="w-full rounded-lg border px-3 py-2 font-body text-sm tracking-widest text-center"
+                style={{ borderColor: "#E5E0D3" }}
+                placeholder="PIN"
+              />
+              {adminPinError && <p className="font-body text-xs text-center" style={{ color: "#C0392B" }}>{adminPinError}</p>}
+              <button type="submit" className="w-full font-body text-sm font-semibold px-5 py-2.5 rounded-full text-white" style={{ backgroundColor: "#1C1B19" }}>
+                Entrar
+              </button>
+              <button type="button" onClick={() => setRole(null)} className="w-full font-body text-xs text-stone-400 hover:text-stone-600">
+                Volver
+              </button>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
     function toggleClientSub(clientName) {
       const current = clientSubs[clientName] || { subscribed: false, fee: 0 };
       const next = { ...clientSubs, [clientName]: { ...current, subscribed: !current.subscribed } };
@@ -973,10 +1021,10 @@ export default function App() {
         {FONTS}
         <div className="border-b bg-white" style={{ borderColor: "#E5E0D3" }}>
           <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
-            <button onClick={() => setRole(null)} className="flex items-center gap-1.5 font-body text-sm text-stone-500 hover:text-stone-700">
+            <button onClick={() => { setRole(null); setAdminUnlocked(false); setAdminPinInput(""); }} className="flex items-center gap-1.5 font-body text-sm text-stone-500 hover:text-stone-700">
               <ChevronLeft size={16} /> Salir
             </button>
-            <span className="font-body text-sm font-semibold" style={{ color: "#1B2A4A" }}>Panel Administrador</span>
+            <span className="font-body text-sm font-semibold" style={{ color: "#1C1B19" }}>Panel Administrador</span>
           </div>
         </div>
 
@@ -984,25 +1032,25 @@ export default function App() {
           <div className="grid sm:grid-cols-4 gap-4">
             <div className="bg-white rounded-2xl p-5 border" style={{ borderColor: "#E5E0D3" }}>
               <p className="font-body text-xs text-stone-400 uppercase tracking-wide">Ingresos totales</p>
-              <p className="font-display text-2xl mt-1" style={{ color: "#1B2A4A" }}>{totalRevenue.toFixed(0)} €</p>
+              <p className="font-display text-2xl mt-1" style={{ color: "#1C1B19" }}>{totalRevenue.toFixed(0)} €</p>
             </div>
             <div className="bg-white rounded-2xl p-5 border" style={{ borderColor: "#E5E0D3" }}>
               <p className="font-body text-xs text-stone-400 uppercase tracking-wide">Pagado a Profesionales</p>
-              <p className="font-display text-2xl mt-1" style={{ color: "#1B2A4A" }}>{totalCost.toFixed(0)} €</p>
+              <p className="font-display text-2xl mt-1" style={{ color: "#1C1B19" }}>{totalCost.toFixed(0)} €</p>
             </div>
-            <div className="bg-white rounded-2xl p-5 border" style={{ borderColor: "#B8860B" }}>
-              <p className="font-body text-xs uppercase tracking-wide" style={{ color: "#B8860B" }}>Tu margen (eventos)</p>
-              <p className="font-display text-2xl mt-1" style={{ color: "#1B2A4A" }}>{totalMargin.toFixed(0)} €</p>
+            <div className="bg-white rounded-2xl p-5 border" style={{ borderColor: "#9C7A3C" }}>
+              <p className="font-body text-xs uppercase tracking-wide" style={{ color: "#9C7A3C" }}>Tu margen (eventos)</p>
+              <p className="font-display text-2xl mt-1" style={{ color: "#1C1B19" }}>{totalMargin.toFixed(0)} €</p>
             </div>
-            <div className="bg-white rounded-2xl p-5 border" style={{ borderColor: "#0F6E6E" }}>
-              <p className="font-body text-xs uppercase tracking-wide" style={{ color: "#0F6E6E" }}>Ingresos por suscripción</p>
-              <p className="font-display text-2xl mt-1" style={{ color: "#1B2A4A" }}>{subsRevenue.toFixed(0)} €/mes</p>
+            <div className="bg-white rounded-2xl p-5 border" style={{ borderColor: "#1C1B19" }}>
+              <p className="font-body text-xs uppercase tracking-wide" style={{ color: "#1C1B19" }}>Ingresos por suscripción</p>
+              <p className="font-display text-2xl mt-1" style={{ color: "#1C1B19" }}>{subsRevenue.toFixed(0)} €/mes</p>
               <p className="font-body text-[11px] text-stone-400">{subscribedCount} local(es) suscrito(s)</p>
             </div>
           </div>
 
           <section>
-            <h2 className="font-display text-xl mb-4" style={{ color: "#1B2A4A" }}>Ganancias por local</h2>
+            <h2 className="font-display text-xl mb-4" style={{ color: "#1C1B19" }}>Ganancias por local</h2>
             {venueRows.length === 0 ? (
               <p className="font-body text-sm text-stone-400">Todavía no hay eventos con match confirmado.</p>
             ) : (
@@ -1010,11 +1058,11 @@ export default function App() {
                 <table className="w-full font-body text-sm">
                   <thead>
                     <tr style={{ backgroundColor: "#F2EFE6" }}>
-                      <th className="text-left px-4 py-3 font-semibold" style={{ color: "#1B2A4A" }}>Local</th>
-                      <th className="text-right px-4 py-3 font-semibold" style={{ color: "#1B2A4A" }}>Eventos</th>
-                      <th className="text-right px-4 py-3 font-semibold" style={{ color: "#1B2A4A" }}>Ingresos</th>
-                      <th className="text-right px-4 py-3 font-semibold" style={{ color: "#1B2A4A" }}>Margen</th>
-                      <th className="text-center px-4 py-3 font-semibold" style={{ color: "#1B2A4A" }}>Suscrito</th>
+                      <th className="text-left px-4 py-3 font-semibold" style={{ color: "#1C1B19" }}>Local</th>
+                      <th className="text-right px-4 py-3 font-semibold" style={{ color: "#1C1B19" }}>Eventos</th>
+                      <th className="text-right px-4 py-3 font-semibold" style={{ color: "#1C1B19" }}>Ingresos</th>
+                      <th className="text-right px-4 py-3 font-semibold" style={{ color: "#1C1B19" }}>Margen</th>
+                      <th className="text-center px-4 py-3 font-semibold" style={{ color: "#1C1B19" }}>Suscrito</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1023,18 +1071,18 @@ export default function App() {
                       return (
                         <tr key={venue} className="border-t" style={{ borderColor: "#E5E0D3" }}>
                           <td className="px-4 py-3">
-                            <span className="font-semibold" style={{ color: "#1B2A4A" }}>{venue}</span>
+                            <span className="font-semibold" style={{ color: "#1C1B19" }}>{venue}</span>
                             <span className="text-stone-400"> · {data.clientName}</span>
                           </td>
                           <td className="px-4 py-3 text-right text-stone-500">{data.count}</td>
                           <td className="px-4 py-3 text-right">{data.revenue.toFixed(0)} €</td>
-                          <td className="px-4 py-3 text-right font-semibold" style={{ color: "#0F6E6E" }}>{(data.revenue - data.cost).toFixed(0)} €</td>
+                          <td className="px-4 py-3 text-right font-semibold" style={{ color: "#1C1B19" }}>{(data.revenue - data.cost).toFixed(0)} €</td>
                           <td className="px-4 py-3">
                             <div className="flex items-center justify-center gap-2">
                               <button
                                 onClick={() => toggleClientSub(venue)}
                                 className="text-xs font-semibold px-3 py-1 rounded-full text-white"
-                                style={{ backgroundColor: sub.subscribed ? "#0F6E6E" : "#B0A896" }}
+                                style={{ backgroundColor: sub.subscribed ? "#1C1B19" : "#B0A896" }}
                               >
                                 {sub.subscribed ? "Sí" : "No"}
                               </button>
@@ -1063,7 +1111,7 @@ export default function App() {
           </section>
 
           <section>
-            <h2 className="font-display text-xl mb-4" style={{ color: "#1B2A4A" }}>Resumen anual</h2>
+            <h2 className="font-display text-xl mb-4" style={{ color: "#1C1B19" }}>Resumen anual</h2>
             <div className="space-y-2">
               {yearOptions.map((yr) => {
                 const yrEvents = matchedEvents.filter((ev) => (ev.date || "").startsWith(yr));
@@ -1071,10 +1119,10 @@ export default function App() {
                 const yrCost = yrEvents.reduce((s, ev) => s + (ev.budget ?? 0) * (ev.spots || 1), 0);
                 return (
                   <div key={yr} className="bg-white rounded-xl p-4 border flex items-center justify-between" style={{ borderColor: "#E5E0D3" }}>
-                    <span className="font-body font-semibold" style={{ color: "#1B2A4A" }}>{yr}</span>
+                    <span className="font-body font-semibold" style={{ color: "#1C1B19" }}>{yr}</span>
                     <span className="font-body text-sm text-stone-500">{yrEvents.length} eventos</span>
                     <span className="font-body text-sm">{yrRevenue.toFixed(0)} € ingresos</span>
-                    <span className="font-body text-sm font-semibold" style={{ color: "#0F6E6E" }}>{(yrRevenue - yrCost).toFixed(0)} € margen</span>
+                    <span className="font-body text-sm font-semibold" style={{ color: "#1C1B19" }}>{(yrRevenue - yrCost).toFixed(0)} € margen</span>
                   </div>
                 );
               })}
@@ -1095,7 +1143,7 @@ export default function App() {
           <div className="mb-2"><StepFlow active={events.some(e => e.applicants.length) ? 2 : 1} /></div>
 
           <section className="bg-white rounded-2xl p-6 border" style={{ borderColor: "#E5E0D3" }}>
-            <h2 className="font-display text-xl mb-4" style={{ color: "#1B2A4A" }}>Publicar evento</h2>
+            <h2 className="font-display text-xl mb-4" style={{ color: "#1C1B19" }}>Publicar evento</h2>
             <form onSubmit={handlePostEvent} className="grid sm:grid-cols-2 gap-3">
               <Input label="Nombre del cliente / local" value={eventForm.clientName} onChange={(v) => setEventForm({ ...eventForm, clientName: v })} />
               <Select label="Tipo" value={eventForm.type}
@@ -1121,7 +1169,7 @@ export default function App() {
                   if (!legal) return null;
                   const belowMinimum = Number(eventForm.budget) < legal.minimum;
                   return (
-                    <p className="font-body text-[11px] mt-1" style={{ color: belowMinimum ? "#C0392B" : "#0F6E6E" }}>
+                    <p className="font-body text-[11px] mt-1" style={{ color: belowMinimum ? "#C0392B" : "#1C1B19" }}>
                       {belowMinimum
                         ? `⚠ Por debajo del mínimo legal (SMI 2026): ${legal.minimum} € para ${legal.hours.toFixed(1)}h. Revísalo antes de publicar.`
                         : `✓ Cumple el mínimo legal orientativo (${legal.minimum} € para ${legal.hours.toFixed(1)}h).`}
@@ -1136,7 +1184,7 @@ export default function App() {
                   placeholder={eventForm.budget ? `Ej. ${Math.round(Number(eventForm.budget) * 1.5)}` : "Igual al pago si se deja vacío"}
                 />
                 {eventForm.budget && eventForm.clientPrice && Number(eventForm.clientPrice) > Number(eventForm.budget) && (
-                  <p className="font-body text-[11px] mt-1" style={{ color: "#0F6E6E" }}>
+                  <p className="font-body text-[11px] mt-1" style={{ color: "#1C1B19" }}>
                     Tu margen: {(Number(eventForm.clientPrice) - Number(eventForm.budget)).toFixed(0)} € por profesional
                   </p>
                 )}
@@ -1149,8 +1197,8 @@ export default function App() {
               {eventForm.type === "vip" && (
                 <div className="sm:col-span-2 rounded-xl p-4 space-y-3" style={{ backgroundColor: "#F2EFE6" }}>
                   <div className="flex items-center gap-2">
-                    <Lock size={14} style={{ color: "#B8860B" }} />
-                    <p className="font-body text-xs font-semibold" style={{ color: "#1B2A4A" }}>Evento confidencial</p>
+                    <Lock size={14} style={{ color: "#9C7A3C" }} />
+                    <p className="font-body text-xs font-semibold" style={{ color: "#1C1B19" }}>Evento confidencial</p>
                   </div>
                   <label className="flex items-start gap-2 font-body text-xs text-stone-600">
                     <input
@@ -1174,7 +1222,7 @@ export default function App() {
               )}
 
               <div className="sm:col-span-2 flex justify-end">
-                <button type="submit" className="flex items-center gap-2 font-body text-sm font-semibold px-5 py-2.5 rounded-full text-white" style={{ backgroundColor: "#1B2A4A" }}>
+                <button type="submit" className="flex items-center gap-2 font-body text-sm font-semibold px-5 py-2.5 rounded-full text-white" style={{ backgroundColor: "#1C1B19" }}>
                   <Send size={14} /> Publicar evento
                 </button>
               </div>
@@ -1182,18 +1230,18 @@ export default function App() {
           </section>
 
           <section>
-            <h2 className="font-display text-xl mb-4" style={{ color: "#1B2A4A" }}>Mis eventos</h2>
+            <h2 className="font-display text-xl mb-4" style={{ color: "#1C1B19" }}>Mis eventos</h2>
             <div className="space-y-5">
               {events.filter(e => e.clientName).map((ev) => (
                 <EventTicket key={ev.id} event={ev}>
                   {ev.selected ? (
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-sm font-body font-semibold" style={{ color: "#0F6E6E" }}>
+                      <div className="flex items-center gap-2 text-sm font-body font-semibold" style={{ color: "#1C1B19" }}>
                         <Check size={16} /> Match confirmado: {profiles.find(p => p.id === ev.selected)?.name}
                       </div>
                       <button
                         onClick={() => setContractView({ event: ev, profile: profiles.find(p => p.id === ev.selected) })}
-                        className="text-xs font-semibold underline" style={{ color: "#1B2A4A" }}
+                        className="text-xs font-semibold underline" style={{ color: "#1C1B19" }}
                       >
                         Ver contrato
                       </button>
@@ -1212,7 +1260,7 @@ export default function App() {
                               <div className="flex items-center gap-3">
                                 <Avatar name={p.name} photo={p.photo} size={36} />
                                 <div className="font-body text-sm">
-                                  <span className="font-semibold" style={{ color: "#1B2A4A" }}>{p.name}</span>
+                                  <span className="font-semibold" style={{ color: "#1C1B19" }}>{p.name}</span>
                                   <span className="text-stone-500"> · {p.age} años{p.height ? ` · ${p.height} cm` : ""} · {p.rate} €/evento</span>
                                   {p.languages && <p className="text-xs text-stone-400">{p.languages}</p>}
                                 </div>
@@ -1220,7 +1268,7 @@ export default function App() {
                               <button
                                 onClick={() => selectApplicant(ev.id, pid)}
                                 className="text-xs font-semibold px-3 py-1.5 rounded-full text-white flex-shrink-0"
-                                style={{ backgroundColor: "#B8860B" }}
+                                style={{ backgroundColor: "#9C7A3C" }}
                               >
                                 Seleccionar
                               </button>
@@ -1255,7 +1303,7 @@ export default function App() {
         {FONTS}
         <Header role="profesional" onBack={() => setRole(null)} saving={saving} />
         <div className="max-w-md mx-auto px-6 py-10">
-          <h2 className="font-display text-2xl mb-1" style={{ color: "#1B2A4A" }}>Crear perfil</h2>
+          <h2 className="font-display text-2xl mb-1" style={{ color: "#1C1B19" }}>Crear perfil</h2>
           <p className="font-body text-sm text-stone-500 mb-6">Verificación de identidad simulada en este prototipo.</p>
           <form onSubmit={handleRegister} className="bg-white rounded-2xl p-6 border space-y-3" style={{ borderColor: "#E5E0D3" }}>
             <div>
@@ -1264,7 +1312,7 @@ export default function App() {
                 <Avatar name={registerForm.name} photo={registerForm.photo} size={64} />
                 <label
                   className="flex items-center gap-2 font-body text-xs font-semibold px-4 py-2 rounded-full cursor-pointer"
-                  style={{ color: "#1B2A4A", border: "1px solid #E5E0D3" }}
+                  style={{ color: "#1C1B19", border: "1px solid #E5E0D3" }}
                 >
                   <Camera size={14} />
                   {photoLoading ? "Procesando…" : registerForm.photo ? "Cambiar foto" : "Subir foto"}
@@ -1320,7 +1368,7 @@ export default function App() {
               options={CITY_OPTIONS.map((c) => [c, c])} />
             <Input label="Tarifa por evento (€)" type="number" value={registerForm.rate} onChange={(v) => setRegisterForm({ ...registerForm, rate: v })} />
             <Textarea label="Bio breve" value={registerForm.bio} onChange={(v) => setRegisterForm({ ...registerForm, bio: v })} />
-            <button type="submit" className="w-full font-body text-sm font-semibold px-5 py-2.5 rounded-full text-white mt-2" style={{ backgroundColor: "#0F6E6E" }}>
+            <button type="submit" className="w-full font-body text-sm font-semibold px-5 py-2.5 rounded-full text-white mt-2" style={{ backgroundColor: "#1C1B19" }}>
               Crear perfil y ver eventos
             </button>
           </form>
@@ -1344,17 +1392,17 @@ export default function App() {
 
         {myEvents.length > 0 && (
           <section>
-            <h2 className="font-display text-xl mb-4" style={{ color: "#1B2A4A" }}>Confirmados</h2>
+            <h2 className="font-display text-xl mb-4" style={{ color: "#1C1B19" }}>Confirmados</h2>
             <div className="space-y-5">
               {myEvents.map((ev) => (
                 <EventTicket key={ev.id} event={ev}>
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm font-body font-semibold" style={{ color: "#0F6E6E" }}>
+                    <div className="flex items-center gap-2 text-sm font-body font-semibold" style={{ color: "#1C1B19" }}>
                       <Check size={16} /> Evento confirmado
                     </div>
                     <button
                       onClick={() => setContractView({ event: ev, profile: myProfile })}
-                      className="text-xs font-semibold underline" style={{ color: "#1B2A4A" }}
+                      className="text-xs font-semibold underline" style={{ color: "#1C1B19" }}
                     >
                       Ver contrato
                     </button>
@@ -1367,14 +1415,14 @@ export default function App() {
 
         <section>
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-            <h2 className="font-display text-xl" style={{ color: "#1B2A4A" }}>Eventos disponibles</h2>
+            <h2 className="font-display text-xl" style={{ color: "#1C1B19" }}>Eventos disponibles</h2>
             <div className="flex items-center gap-2">
               <MapPin size={14} className="text-stone-400" />
               <select
                 value={cityFilter}
                 onChange={(e) => setCityFilter(e.target.value)}
                 className="font-body text-xs font-semibold px-3 py-1.5 rounded-full bg-white"
-                style={{ border: "1px solid #E5E0D3", color: "#1B2A4A" }}
+                style={{ border: "1px solid #E5E0D3", color: "#1C1B19" }}
               >
                 <option value="Todas">Todas las ciudades</option>
                 {CITY_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -1395,7 +1443,7 @@ export default function App() {
                       disabled={applied}
                       onClick={() => applyToEvent(ev.id)}
                       className="text-xs font-semibold px-4 py-2 rounded-full text-white disabled:opacity-50"
-                      style={{ backgroundColor: applied ? "#A8A296" : "#B8860B" }}
+                      style={{ backgroundColor: applied ? "#A8A296" : "#9C7A3C" }}
                     >
                       {applied ? "Ya has aplicado" : "Aplicar"}
                     </button>
@@ -1420,18 +1468,18 @@ function Header({ role, onBack, name, photo, saving }) {
           <ChevronLeft size={16} /> Cambiar rol
         </button>
         <div className="flex items-center gap-3">
-          <span className="font-body text-[11px]" style={{ color: saving ? "#B8860B" : "#B0A88E" }}>
+          <span className="font-body text-[11px]" style={{ color: saving ? "#9C7A3C" : "#B0A88E" }}>
             {saving ? "Guardando…" : "Guardado"}
           </span>
           <div className="flex items-center gap-2">
             {role === "cliente" ? (
-              <Building2 size={15} style={{ color: "#1B2A4A" }} />
+              <Building2 size={15} style={{ color: "#1C1B19" }} />
             ) : photo ? (
               <Avatar name={name} photo={photo} size={22} />
             ) : (
-              <UserRound size={15} style={{ color: "#0F6E6E" }} />
+              <UserRound size={15} style={{ color: "#1C1B19" }} />
             )}
-            <span className="font-body text-sm font-semibold" style={{ color: "#1B2A4A" }}>
+            <span className="font-body text-sm font-semibold" style={{ color: "#1C1B19" }}>
               {role === "cliente" ? "Panel Cliente" : `Panel Profesional${name ? " · " + name : ""}`}
             </span>
           </div>
@@ -1491,8 +1539,8 @@ function Select({ label, value, onChange, options }) {
 function Toast({ text }) {
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-      <div className="flex items-center gap-2 font-body text-sm text-white px-4 py-2.5 rounded-full shadow-lg" style={{ backgroundColor: "#1B2A4A" }}>
-        <Sparkles size={14} style={{ color: "#B8860B" }} /> {text}
+      <div className="flex items-center gap-2 font-body text-sm text-white px-4 py-2.5 rounded-full shadow-lg" style={{ backgroundColor: "#1C1B19" }}>
+        <Sparkles size={14} style={{ color: "#9C7A3C" }} /> {text}
       </div>
     </div>
   );
