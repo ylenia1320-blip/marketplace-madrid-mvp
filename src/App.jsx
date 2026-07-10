@@ -110,18 +110,17 @@ const SMI_HORA_MIN = SMI_JORNADA_MIN / 8;
 
 function parseEventHours(timeStr) {
   if (!timeStr) return null;
-  const parts = timeStr.split("-").map((s) => s.trim());
-  if (parts.length !== 2) return null;
-  const toMinutes = (t) => {
-    const m = t.match(/^(\d{1,2}):(\d{2})$/);
-    if (!m) return null;
-    return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
-  };
-  const start = toMinutes(parts[0]);
-  const end = toMinutes(parts[1]);
-  if (start === null || end === null) return null;
+  // Extrae los dos primeros patrones HH:MM del texto, sea cual sea el separador
+  // que use la persona ("23:00 - 05:00", "23:00 a 5:00", "de 23h a 5h", etc.)
+  const matches = [...timeStr.matchAll(/(\d{1,2}):?(\d{2})?\s*h?/gi)]
+    .map((m) => ({ h: parseInt(m[1], 10), min: m[2] ? parseInt(m[2], 10) : 0 }))
+    .filter((t) => t.h >= 0 && t.h <= 23 && t.min >= 0 && t.min <= 59);
+  if (matches.length < 2) return null;
+  const start = matches[0].h * 60 + matches[0].min;
+  const end = matches[1].h * 60 + matches[1].min;
   let diff = end - start;
   if (diff <= 0) diff += 24 * 60; // cruza medianoche
+  if (diff <= 0 || diff > 20 * 60) return null; // resultado poco razonable, descartar
   return diff / 60;
 }
 
@@ -130,6 +129,13 @@ function legalMinimumForEvent(timeStr) {
   if (!hours) return null;
   return { hours, minimum: Math.round(hours * SMI_HORA_MIN * 100) / 100 };
 }
+
+// Lista de horas en intervalos de 30 min, para los desplegables de horario (sin ambigüedad de formato).
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+  const h = String(Math.floor(i / 2)).padStart(2, "0");
+  const m = i % 2 === 0 ? "00" : "30";
+  return `${h}:${m}`;
+});
 
 function Avatar({ name, photo, size = 40 }) {
   const initials = (name || "?").trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
@@ -253,6 +259,18 @@ function loadJsPDF() {
 }
 
 // Parte un texto en líneas que caben en un ancho máximo (pdf-lib no lo hace de forma nativa).
+// Extrae las dos horas (HH:MM) de un texto de horario libre, sea cual sea el
+// separador usado ("23:00 - 05:00", "23:00 a 5:00", "de 23h a 5h", etc.).
+function extractTimes(timeStr) {
+  if (!timeStr) return [null, null];
+  const matches = [...timeStr.matchAll(/(\d{1,2}):?(\d{2})?\s*h?/gi)]
+    .map((m) => ({ h: parseInt(m[1], 10), min: m[2] ? parseInt(m[2], 10) : 0 }))
+    .filter((t) => t.h >= 0 && t.h <= 23 && t.min >= 0 && t.min <= 59);
+  if (matches.length < 2) return [null, null];
+  const fmt = (t) => `${String(t.h).padStart(2, "0")}:${String(t.min).padStart(2, "0")}`;
+  return [fmt(matches[0]), fmt(matches[1])];
+}
+
 function wrapText(text, font, size, maxWidth) {
   const words = String(text).split(/\s+/);
   const lines = [];
@@ -381,7 +399,7 @@ async function buildOfficialContractPdf({ PDFLib, event, profile, today }) {
   // Relleno automático de los huecos del formulario oficial (no manual).
   // Coordenadas obtenidas del propio PDF original (595.28 x 841.89 pt).
   // ---------------------------------------------------------------------
-  const [startTime, endTime] = (event.time || "").split("-").map((s) => s.trim());
+  const [startTime, endTime] = extractTimes(event.time);
   const eventDateStr = event.date || "";
   const fillColor = rgb(27 / 255, 42 / 255, 74 / 255);
   const fillFont = fontRegular;
@@ -688,7 +706,7 @@ export default function App() {
   const [photoError, setPhotoError] = useState("");
   const [photoLoading, setPhotoLoading] = useState(false);
   const [eventForm, setEventForm] = useState({
-    clientName: "", type: "discoteca", venue: "", date: "", time: "",
+    clientName: "", type: "discoteca", venue: "", date: "", timeStart: "", timeEnd: "",
     location: "", budget: "", spots: "1", functions: "",
     confidential: false, billingEntity: "",
   });
@@ -806,9 +824,10 @@ export default function App() {
     e.preventDefault();
     if (!eventForm.clientName || !eventForm.venue || !eventForm.date) return;
     const id = "e" + Date.now();
-    const next = [{ id, ...eventForm, budget: eventForm.budget ? Number(eventForm.budget) : null, spots: Number(eventForm.spots), applicants: [], selected: null }, ...events];
+    const combinedTime = eventForm.timeStart && eventForm.timeEnd ? `${eventForm.timeStart} - ${eventForm.timeEnd}` : "";
+    const next = [{ id, ...eventForm, time: combinedTime, budget: eventForm.budget ? Number(eventForm.budget) : null, spots: Number(eventForm.spots), applicants: [], selected: null }, ...events];
     setEvents(next);
-    setEventForm({ clientName: "", type: "discoteca", venue: "", date: "", time: "", location: "", budget: "", spots: "1", functions: "", confidential: false, billingEntity: "" });
+    setEventForm({ clientName: "", type: "discoteca", venue: "", date: "", timeStart: "", timeEnd: "", location: "", budget: "", spots: "1", functions: "", confidential: false, billingEntity: "" });
     persist(undefined, next);
     flash(eventForm.confidential ? "Evento privado publicado — solo visible por invitación." : "Evento publicado y guardado.");
   }
@@ -903,15 +922,18 @@ export default function App() {
               <Input label="Nombre del evento / venue" value={eventForm.venue} onChange={(v) => setEventForm({ ...eventForm, venue: v })} />
               <Input label="Ubicación" value={eventForm.location} onChange={(v) => setEventForm({ ...eventForm, location: v })} />
               <Input label="Fecha" type="date" value={eventForm.date} onChange={(v) => setEventForm({ ...eventForm, date: v })} />
-              <Input label="Horario" placeholder="23:00 - 05:00" value={eventForm.time} onChange={(v) => setEventForm({ ...eventForm, time: v })} />
+              <Select label="Hora de entrada" value={eventForm.timeStart} onChange={(v) => setEventForm({ ...eventForm, timeStart: v })}
+                options={[["", "Selecciona"], ...TIME_OPTIONS.map((t) => [t, t])]} />
+              <Select label="Hora de salida" value={eventForm.timeEnd} onChange={(v) => setEventForm({ ...eventForm, timeEnd: v })}
+                options={[["", "Selecciona"], ...TIME_OPTIONS.map((t) => [t, t])]} />
               <div>
                 <Input
                   label={eventForm.type === "vip" ? "Presupuesto (opcional, a negociar)" : "Presupuesto por persona (€)"}
                   type="number" value={eventForm.budget} onChange={(v) => setEventForm({ ...eventForm, budget: v })}
                 />
                 {(() => {
-                  if (eventForm.type === "vip" || !eventForm.budget || !eventForm.time) return null;
-                  const legal = legalMinimumForEvent(eventForm.time);
+                  if (eventForm.type === "vip" || !eventForm.budget || !eventForm.timeStart || !eventForm.timeEnd) return null;
+                  const legal = legalMinimumForEvent(`${eventForm.timeStart} - ${eventForm.timeEnd}`);
                   if (!legal) return null;
                   const belowMinimum = Number(eventForm.budget) < legal.minimum;
                   return (
