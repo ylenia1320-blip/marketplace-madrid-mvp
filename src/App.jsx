@@ -332,7 +332,7 @@ async function buildOfficialContractPdf({ PDFLib, event, profile, today }) {
   page.drawText("Datos para cumplimentar el contrato oficial", {
     x: margin, y: pageH - 34, size: 15, font: fontBold, color: rgb(1, 1, 1),
   });
-  page.drawText("Contrato artístico de duración determinada — SEPE, códigos 407/507 (RD 1435/1985)", {
+  page.drawText("Contrato temporal por circunstancias de la producción — SEPE, código 402/502 (art. 15.2 ET)", {
     x: margin, y: pageH - 50, size: 9, font: fontRegular, color: rgb(1, 1, 1),
   });
 
@@ -388,7 +388,7 @@ async function buildOfficialContractPdf({ PDFLib, event, profile, today }) {
   drawField("Documento generado el", today);
 
   page.drawText(
-    "A partir de aquí: páginas 1, 2, 3, 13 y 22 del modelo oficial \"Contrato de Trabajo Temporal\" del SEPE (www.sepe.es).",
+    "A partir de aquí: páginas 1, 2, 3, 4 y 22 del modelo oficial \"Contrato de Trabajo Temporal\" del SEPE (www.sepe.es).",
     { x: margin, y: 40, size: 7.5, font: fontRegular, color: GREY }
   );
 
@@ -423,24 +423,21 @@ async function buildOfficialContractPdf({ PDFLib, event, profile, today }) {
     page1.drawText(String(event.budget), { x: 264, y: page1H - 743 - 9, size: fillSize, font: fillFont, color: fillColor });
   }
 
-  // Página 4 del extracto (cláusula específica artística, original pág. 13): copiedPages[3]
+  // Página 4 del extracto (cláusula específica por circunstancias de la producción,
+  // "Situaciones ocasionales previsibles, de duración reducida y delimitada", código 402/502)
   const page4 = copiedPages[3];
   const page4H = page4.getHeight();
-  const causa = `Prestación del servicio de imagen/azafata para el evento organizado por ${event.billingEntity || event.clientName} en ${event.venue}.`;
-  const causaWrapped = wrapText(causa, fillFont, fillSize, 330);
-  causaWrapped.forEach((line, i) => {
-    page4.drawText(line, { x: 200, y: page4H - 362.3 - 9 - i * 11, size: fillSize, font: fillFont, color: fillColor });
+  // Marca la casilla "Situaciones ocasionales previsibles..." (la que corresponde a bolos puntuales)
+  page4.drawText("X", { x: 68, y: page4H - 329.8 - 9, size: 10, font: fontBold, color: fillColor });
+  // Marca "Tiempo completo" para la duración del propio evento
+  page4.drawText("X", { x: 82, y: page4H - 369.8 - 9, size: 10, font: fontBold, color: fillColor });
+  const circunstancias = `Necesidad puntual de personal de imagen/azafatas para el evento organizado por ${event.billingEntity || event.clientName} en ${event.venue}, el ${eventDateStr}${startTime ? `, de ${startTime} a ${endTime || "fin del evento"}` : ""}. No vinculada a la actividad estructural u ordinaria de la empresa.`;
+  const circunstanciasWrapped = wrapText(circunstancias, fillFont, fillSize, 500);
+  circunstanciasWrapped.slice(0, 2).forEach((line, i) => {
+    const x = i === 0 ? 295 : 40;
+    const yTop = i === 0 ? 404.5 : 414.5;
+    page4.drawText(line, { x, y: page4H - yTop - 9, size: fillSize, font: fillFont, color: fillColor });
   });
-  const duracionTexto = `Un (1) día — ${eventDateStr}${startTime ? `, de ${startTime} a ${endTime || "fin del evento"}` : ""}.`;
-  page4.drawText(duracionTexto, { x: 192, y: page4H - 388.3 - 9, size: fillSize, font: fillFont, color: fillColor });
-  // Marca "Personal Técnico y Auxiliar" (categoría aplicable a modelos/azafatas de imagen)
-  page4.drawText("X", { x: 72, y: page4H - 454.5 - 9, size: 10, font: fontBold, color: fillColor });
-  if (event.functions) {
-    const funcWrapped = wrapText(event.functions, fillFont, fillSize, 450);
-    funcWrapped.slice(0, 2).forEach((line, i) => {
-      page4.drawText(line, { x: 95, y: page4H - 486.3 - 9 - i * 11, size: fillSize, font: fillFont, color: fillColor });
-    });
-  }
 
   return outDoc;
 }
@@ -641,7 +638,7 @@ function ContractPreview({ event, profile, onClose }) {
             <p><strong>Salario bruto pactado:</strong> {event.budget} € (antes de retenciones)</p>
           </div>
 
-          <p className="text-xs uppercase tracking-wide font-semibold pt-2" style={{ color: "#B8860B" }}>Contrato de trabajo — Artista de un día (RD 1435/1985)</p>
+          <p className="text-xs uppercase tracking-wide font-semibold pt-2" style={{ color: "#B8860B" }}>Contrato de trabajo temporal — Circunstancias de la producción (art. 15.2 ET)</p>
           <p>En Madrid, a {today}.</p>
           <p className="font-semibold" style={{ color: "#1B2A4A" }}>REUNIDOS</p>
           <p>De una parte, <strong>[NOMBRE COMERCIAL / RAZÓN SOCIAL DE LA EMPRESA]</strong>, con NIF/CIF [NIF/CIF], en su condición de empleadora, en adelante "la Empresa".</p>
@@ -649,17 +646,17 @@ function ContractPreview({ event, profile, onClose }) {
           <p>Ambas partes se reconocen mutua capacidad legal para contratar y, a tal efecto,</p>
           <p className="font-semibold" style={{ color: "#1B2A4A" }}>EXPONEN</p>
           <p>Que la Empresa ha sido contratada por <strong>{event.billingEntity || event.clientName}</strong> para prestar el servicio descrito en el Anexo I, y que necesita para ello los servicios profesionales de la Trabajadora para el evento correspondiente.</p>
-          <p>Y en su virtud, ACUERDAN suscribir el presente contrato de trabajo especial de artistas en espectáculos públicos, con arreglo a las siguientes:</p>
+          <p>Y en su virtud, ACUERDAN suscribir el presente contrato de trabajo temporal por circunstancias de la producción, con arreglo a las siguientes:</p>
 
-          <p><strong>Artículo 1. Objeto y régimen jurídico.</strong> La Trabajadora prestará a la Empresa el servicio descrito en el Anexo I, bajo la relación laboral especial de artistas en espectáculos públicos regulada por el Real Decreto 1435/1985, de 1 de agosto.</p>
-          <p><strong>Artículo 2. Duración.</strong> El presente contrato tiene una duración de un (1) día, coincidente con la fecha del evento. La Trabajadora queda dada de alta en el régimen correspondiente de la Seguridad Social desde el inicio de la jornada y de baja a su finalización.</p>
+          <p><strong>Artículo 1. Objeto y régimen jurídico.</strong> La Trabajadora prestará a la Empresa el servicio descrito en el Anexo I, mediante contrato de duración determinada por circunstancias de la producción (art. 15.2 ET), en la modalidad de situación ocasional, previsible y de duración reducida y delimitada, no vinculada a la actividad estructural u ordinaria de la Empresa.</p>
+          <p><strong>Artículo 2. Duración y causa.</strong> El presente contrato tiene una duración de un (1) día, coincidente con la fecha del evento. La Trabajadora queda dada de alta en la Seguridad Social desde el inicio de la jornada y de baja a su finalización. La causa es la necesidad puntual de personal para el evento del Anexo I, sin exceder de 90 días/año conforme al art. 15.2 ET.</p>
           <p><strong>Artículo 3. Retribución.</strong> La Trabajadora percibirá la cantidad indicada en el Anexo I en concepto de salario bruto, sobre la que se aplicarán las retenciones de IRPF y cotizaciones a la Seguridad Social legalmente establecidas. La Empresa hará entrega de la nómina correspondiente en el plazo legal.</p>
           <p className="text-xs text-stone-400">La retribución pactada cumple el salario mínimo interprofesional vigente para contratos de duración determinada inferiores a 120 días (57,82 €/jornada legal, RD 126/2026), sin perjuicio de la tabla salarial específica que, en su caso, establezca el convenio colectivo sectorial aplicable.</p>
           <p><strong>Artículo 4. Cancelaciones.</strong> En caso de cancelación del evento por causas ajenas a la Trabajadora con menos de 48-72 horas de antelación, la Empresa abonará la compensación pactada. En caso de que la Trabajadora no pueda acudir tras confirmar, deberá comunicarlo con la mayor antelación posible.</p>
           <p><strong>Artículo 5. Obligaciones de la Trabajadora.</strong> Prestar el servicio con la diligencia profesional habitual; cumplir el horario y ubicación pactados; respetar el código de conducta e imagen razonablemente exigido para el evento.</p>
           <p><strong>Artículo 6. Obligaciones de la Empresa.</strong> Dar de alta a la Trabajadora en la Seguridad Social antes del inicio de la jornada; facilitar las condiciones adecuadas para la prestación del servicio; abonar la retribución pactada y emitir la nómina en el plazo legal.</p>
           <p><strong>Artículo 7. Protección de datos e imagen.</strong> La Empresa se compromete a utilizar cualquier imagen o dato personal de la Trabajadora exclusivamente para los fines aquí previstos, respetando la Ley Orgánica 1/1982 y la normativa de protección de datos.</p>
-          <p><strong>Artículo 8. Legislación y jurisdicción.</strong> Este contrato se rige por el Real Decreto 1435/1985 y demás normativa laboral española aplicable. Para cualquier controversia, ambas partes se someten a los Juzgados de lo Social de Madrid capital.</p>
+          <p><strong>Artículo 8. Legislación y jurisdicción.</strong> Este contrato se rige por el artículo 15.2 del Estatuto de los Trabajadores, el Real Decreto-ley 32/2021, y demás normativa laboral española aplicable. Para cualquier controversia, ambas partes se someten a los Juzgados de lo Social de Madrid capital.</p>
           <p className="text-xs text-stone-400 pt-2">Documento generado automáticamente a partir de la plantilla legal del proyecto. Requiere firma de ambas partes para su validez.</p>
         </div>
         <div className="p-5 border-t flex flex-col gap-2" style={{ borderColor: "#E5E0D3" }}>
